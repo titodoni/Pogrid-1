@@ -12,6 +12,7 @@ import {
   BarChart2,
   FileDown,
   DollarSign,
+  type LucideIcon,
 } from 'lucide-react';
 
 interface BottomNavProps {
@@ -22,7 +23,7 @@ interface BottomNavProps {
 interface Tab {
   label: string;
   route: string;
-  icon: React.ComponentType<{ size?: number; className?: string }>;
+  icon: LucideIcon;
 }
 
 function getTabsForRole(role: string, department: string): Tab[] {
@@ -84,9 +85,7 @@ export function BottomNav({ role, department }: BottomNavProps) {
 
   const tabs = getTabsForRole(role, department);
 
-  return {
-    /* Fixed bottom nav: h-16 + pb-safe for iOS safe area (UIUX.md Spacing & Layout Grid) */
-  } && (
+  return (
     <nav className="fixed bottom-0 left-0 right-0 h-16 bg-white border-t border-[#E5E7EB] z-50 pb-safe">
       <div className="flex items-center h-full">
         {tabs.map((tab) => {
