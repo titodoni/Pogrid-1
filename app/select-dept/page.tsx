@@ -1,7 +1,7 @@
 'use client';
 export const dynamic = 'force-dynamic';
 
-import React from 'react';
+import React, { useState, useRef } from 'react';
 import {
   Pencil,
   ShoppingCart,
@@ -21,17 +21,18 @@ import {
 } from 'lucide-react';
 import { mockUsers } from '@/lib/mockData';
 import useUIStore from '@/store/uiStore';
+import { OriginDrawer } from '@/components/ui/OriginDrawer';
 
-// ─── Helpers ────────────────────────────────────────────────────────────────
+// ─── Helpers ───────────────────────────────────────────────────────────────
 
 function getInitials(name: string): string {
   const parts = name.trim().split(' ');
   const first = parts[0]?.[0] ?? '';
-  const last = parts[parts.length - 1]?.[0] ?? '';
+  const last  = parts[parts.length - 1]?.[0] ?? '';
   return (first + last).toUpperCase();
 }
 
-// ─── Dept config (9 cards per Amendment #13) ─────────────────────────────────
+// ─── Dept config ───────────────────────────────────────────────────────────────
 
 const DEPT_CARDS: { name: string; icon: LucideIcon }[] = [
   { name: 'Drafting',   icon: Pencil },
@@ -45,19 +46,99 @@ const DEPT_CARDS: { name: string; icon: LucideIcon }[] = [
   { name: 'Sales',      icon: Briefcase },
 ];
 
-// ─── Subcomponents ─────────────────────────────────────────────────────────
+// ─── ForgotPinSheet ───────────────────────────────────────────────────────────
 
-function Overlay({ onClick }: { onClick: () => void }) {
+function ForgotPinSheet({ onClose }: { onClose: () => void }) {
   return (
-    <div
-      className="fixed inset-0 bg-black/40 z-40"
-      onClick={onClick}
-      aria-hidden="true"
-    />
+    <>
+      <div className="fixed inset-0 bg-black/40 z-40" onClick={onClose} aria-hidden="true" />
+      <div className="fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-2xl shadow-xl animate-slide-up max-h-[80vh] flex flex-col">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-[#E5E7EB] flex-shrink-0">
+          <span className="text-lg font-semibold text-[#1A1A2E]">Lupa PIN</span>
+          <button type="button" onClick={onClose} className="flex items-center justify-center min-w-[48px] min-h-[48px] text-[#6B7280]" aria-label="Tutup">
+            <X size={20} />
+          </button>
+        </div>
+        <div className="overflow-y-auto flex-1 px-4 py-4 flex flex-col gap-4">
+          <p className="text-sm font-semibold text-[#1A1A2E]">PIN Terlupakan?</p>
+          <a href="tel:+62271000000" className="flex items-center gap-3 min-h-[48px]">
+            <Phone size={20} className="text-[#2A7B76] flex-shrink-0" />
+            <div className="flex flex-col">
+              <span className="text-sm font-medium text-[#1A1A2E]">+62 271 000 000</span>
+              <span className="text-xs text-[#6B7280]">Jam kerja 08:00–17:00</span>
+            </div>
+          </a>
+          <a href="mailto:admin@pogrid.local" className="flex items-center gap-3 min-h-[48px]">
+            <Mail size={20} className="text-[#2A7B76] flex-shrink-0" />
+            <span className="text-sm font-medium text-[#1A1A2E]">admin@pogrid.local</span>
+          </a>
+          <a href="https://wa.me/6227100000" target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 min-h-[48px]">
+            <MessageCircle size={20} className="text-[#2A7B76] flex-shrink-0" />
+            <span className="text-sm font-medium text-[#1A1A2E]">WhatsApp Admin</span>
+          </a>
+          <p className="text-[13px] text-[#6B7280] leading-relaxed">
+            Admin dapat reset PIN Anda. Siapkan identitas karyawan. Estimasi 5 menit.
+          </p>
+        </div>
+        <div className="px-4 pb-6 pt-2 flex-shrink-0">
+          <button type="button" onClick={onClose} className="w-full min-h-[48px] rounded-xl border border-[#E5E7EB] text-sm font-medium text-[#6B7280]">Tutup</button>
+        </div>
+      </div>
+    </>
   );
 }
 
-function UserDrawer({
+// ─── DepartmentGrid ─────────────────────────────────────────────────────────────
+
+interface DepartmentGridProps {
+  selectedDept: string | null;
+  onCardTap: (name: string, rect: DOMRect) => void;
+}
+
+function DepartmentGrid({ selectedDept, onCardTap }: DepartmentGridProps) {
+  // Store refs by dept name to capture each card's DOMRect
+  const cardRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+
+  function handleTap(name: string) {
+    const el = cardRefs.current[name];
+    const rect = el?.getBoundingClientRect() ?? null;
+    if (rect) onCardTap(name, rect);
+  }
+
+  return (
+    <div className="grid grid-cols-3 gap-3">
+      {DEPT_CARDS.map(({ name, icon: Icon }) => {
+        const isSelected = selectedDept === name;
+        return (
+          <button
+            key={name}
+            type="button"
+            ref={(el) => { cardRefs.current[name] = el; }}
+            onClick={() => handleTap(name)}
+            className={[
+              'bg-white rounded-xl border border-[#E5E7EB] shadow-sm',
+              'p-3 flex flex-col items-center justify-center gap-2',
+              'min-h-[80px] min-w-[56px] cursor-pointer select-none',
+              'transition-all duration-150',
+              isSelected
+                ? 'scale-[1.04] shadow-md border-[#2A7B76]'
+                : 'hover:scale-[1.02]',
+            ].join(' ')}
+          >
+            <Icon size={32} className="text-[#2A7B76]" />
+            <span className="text-[14px] font-medium text-[#1A1A2E] leading-tight text-center">
+              {name}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+// ─── UserDrawerContent (rendered inside OriginDrawer) ─────────────────────────────
+
+function UserDrawerContent({
   deptName,
   onClose,
 }: {
@@ -78,9 +159,14 @@ function UserDrawer({
   }
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-2xl shadow-xl animate-slide-up max-h-[70vh] flex flex-col">
+    <>
+      {/* Drag handle */}
+      <div className="flex justify-center pt-3 pb-1 flex-shrink-0">
+        <div className="w-10 h-1 rounded-full bg-[#E5E7EB]" />
+      </div>
+
       {/* Header */}
-      <div className="flex items-center gap-2 px-4 py-3 border-b border-[#E5E7EB] flex-shrink-0">
+      <div className="flex items-center gap-2 px-4 pb-3 border-b border-[#E5E7EB] flex-shrink-0">
         <button
           type="button"
           onClick={onClose}
@@ -120,118 +206,48 @@ function UserDrawer({
                   </span>
                 </div>
                 <div className="flex flex-col items-start">
-                  <span className="text-base font-semibold text-[#1A1A2E] leading-tight">
-                    {user.name}
-                  </span>
-                  <span className="text-[13px] text-[#6B7280] capitalize">
-                    {user.role}
-                  </span>
+                  <span className="text-base font-semibold text-[#1A1A2E] leading-tight">{user.name}</span>
+                  <span className="text-[13px] text-[#6B7280] capitalize">{user.role}</span>
                 </div>
               </button>
             );
           })
         )}
       </div>
-    </div>
+    </>
   );
 }
 
-function ForgotPinSheet({ onClose }: { onClose: () => void }) {
-  return (
-    <div className="fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-2xl shadow-xl animate-slide-up max-h-[80vh] flex flex-col">
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-[#E5E7EB] flex-shrink-0">
-        <span className="text-lg font-semibold text-[#1A1A2E]">Lupa PIN</span>
-        <button
-          type="button"
-          onClick={onClose}
-          className="flex items-center justify-center min-w-[48px] min-h-[48px] text-[#6B7280]"
-          aria-label="Tutup"
-        >
-          <X size={20} />
-        </button>
-      </div>
-
-      {/* Content */}
-      <div className="overflow-y-auto flex-1 px-4 py-4 flex flex-col gap-4">
-        <p className="text-sm font-semibold text-[#1A1A2E]">PIN Terlupakan?</p>
-
-        {/* Phone */}
-        <a
-          href="tel:+62271000000"
-          className="flex items-center gap-3 min-h-[48px]"
-        >
-          <Phone size={20} className="text-[#2A7B76] flex-shrink-0" />
-          <div className="flex flex-col">
-            <span className="text-sm font-medium text-[#1A1A2E]">+62 271 000 000</span>
-            <span className="text-xs text-[#6B7280]">Jam kerja 08:00–17:00</span>
-          </div>
-        </a>
-
-        {/* Email */}
-        <a
-          href="mailto:admin@pogrid.local"
-          className="flex items-center gap-3 min-h-[48px]"
-        >
-          <Mail size={20} className="text-[#2A7B76] flex-shrink-0" />
-          <span className="text-sm font-medium text-[#1A1A2E]">admin@pogrid.local</span>
-        </a>
-
-        {/* WhatsApp */}
-        <a
-          href="https://wa.me/6227100000"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center gap-3 min-h-[48px]"
-        >
-          <MessageCircle size={20} className="text-[#2A7B76] flex-shrink-0" />
-          <span className="text-sm font-medium text-[#1A1A2E]">WhatsApp Admin</span>
-        </a>
-
-        {/* Note */}
-        <p className="text-[13px] text-[#6B7280] leading-relaxed">
-          Admin dapat reset PIN Anda. Siapkan identitas karyawan. Estimasi 5 menit.
-        </p>
-      </div>
-
-      {/* Close button */}
-      <div className="px-4 pb-6 pt-2 flex-shrink-0">
-        <button
-          type="button"
-          onClick={onClose}
-          className="w-full min-h-[48px] rounded-xl border border-[#E5E7EB] text-sm font-medium text-[#6B7280]"
-        >
-          Tutup
-        </button>
-      </div>
-    </div>
-  );
-}
-
-// ─── Main Page ───────────────────────────────────────────────────────────────
+// ─── Main Page ──────────────────────────────────────────────────────────────
 
 export default function SelectDeptPage() {
-  const selectedDept  = useUIStore((s) => s.selectedDept);
-  const drawerOpen    = useUIStore((s) => s.drawerOpen);
-  const forgotPinOpen = useUIStore((s) => s.forgotPinOpen);
-  const { setSelectedDept, setDrawerOpen, setForgotPinOpen } = useUIStore.getState();
+  // ── Local state: keeps page self-contained, syncs to Zustand for /login guard ──
+  const [selectedDept,  setSelectedDept]  = useState<string | null>(null);
+  const [drawerOpen,    setDrawerOpen]    = useState(false);
+  const [triggerRect,   setTriggerRect]   = useState<DOMRect | null>(null);
+  const [forgotPinOpen, setForgotPinOpen] = useState(false);
 
-  function handleCardTap(deptName: string) {
-    setSelectedDept(deptName);
+  function handleCardTap(name: string, rect: DOMRect) {
+    setSelectedDept(name);
+    setTriggerRect(rect);
     setDrawerOpen(true);
+    // Mirror into Zustand so /login can read it
+    useUIStore.getState().setSelectedDept(name);
+    useUIStore.getState().setDrawerOpen(true);
   }
 
   function handleCloseDrawer() {
     setDrawerOpen(false);
     setSelectedDept(null);
+    setTriggerRect(null);
+    useUIStore.getState().setDrawerOpen(false);
+    useUIStore.getState().setSelectedDept(null);
   }
-
-  const anySheetOpen = drawerOpen || forgotPinOpen;
 
   return (
     <div className="min-h-screen bg-[#F8F9FA] px-4 py-8 relative">
 
-      {/* ── Logo ── */}
+      {/* Logo */}
       <div className="flex flex-col items-center mb-6">
         <div className="w-20 h-20 rounded-full bg-[#2A7B76] flex items-center justify-center">
           <span className="text-white text-2xl font-bold select-none">PG</span>
@@ -241,33 +257,10 @@ export default function SelectDeptPage() {
         </h1>
       </div>
 
-      {/* ── 3×3 Department Card Grid ── */}
-      <div className="grid grid-cols-3 gap-3">
-        {DEPT_CARDS.map(({ name, icon: Icon }) => {
-          const isSelected = selectedDept === name && drawerOpen;
-          return (
-            <button
-              key={name}
-              type="button"
-              onClick={() => handleCardTap(name)}
-              className={[
-                'bg-white rounded-xl border border-[#E5E7EB] shadow-sm',
-                'p-3 flex flex-col items-center justify-center gap-2',
-                'min-h-[80px] min-w-[56px] cursor-pointer',
-                'transition-transform duration-150',
-                isSelected ? 'scale-[1.02] shadow-md' : 'hover:scale-[1.02]',
-              ].join(' ')}
-            >
-              <Icon size={32} className="text-[#2A7B76]" />
-              <span className="text-[14px] font-medium text-[#1A1A2E] leading-tight text-center">
-                {name}
-              </span>
-            </button>
-          );
-        })}
-      </div>
+      {/* Department card grid — source of interaction */}
+      <DepartmentGrid selectedDept={selectedDept} onCardTap={handleCardTap} />
 
-      {/* ── Lupa PIN link ── */}
+      {/* Lupa PIN link */}
       <div className="mt-8 flex justify-center">
         <button
           type="button"
@@ -278,21 +271,19 @@ export default function SelectDeptPage() {
         </button>
       </div>
 
-      {/* ── Overlays & Bottom Sheets ── */}
-      {anySheetOpen && (
-        <Overlay
-          onClick={() => {
-            setDrawerOpen(false);
-            setForgotPinOpen(false);
-            setSelectedDept(null);
-          }}
-        />
-      )}
+      {/* Origin-anchored user drawer */}
+      <OriginDrawer
+        open={drawerOpen}
+        triggerRect={triggerRect}
+        onClose={handleCloseDrawer}
+        maxHeight="70vh"
+      >
+        {selectedDept && (
+          <UserDrawerContent deptName={selectedDept} onClose={handleCloseDrawer} />
+        )}
+      </OriginDrawer>
 
-      {drawerOpen && selectedDept && (
-        <UserDrawer deptName={selectedDept} onClose={handleCloseDrawer} />
-      )}
-
+      {/* Forgot PIN sheet (standard bottom sheet, no origin needed) */}
       {forgotPinOpen && (
         <ForgotPinSheet onClose={() => setForgotPinOpen(false)} />
       )}
