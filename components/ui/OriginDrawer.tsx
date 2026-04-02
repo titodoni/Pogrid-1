@@ -1,79 +1,23 @@
 'use client';
 
 /**
- * OriginDrawer — origin-based drawer that animates FROM the tapped card.
+ * OriginDrawer — animates a bottom-sheet from the tapped card's position.
  *
- * Usage:
- *   const [rect, setRect] = useState<DOMRect | null>(null)
- *   const [open, setOpen] = useState(false)
- *
- *   <button onClick={e => { setRect(e.currentTarget.getBoundingClientRect()); setOpen(true) }}>
- *     Open
- *   </button>
- *
- *   <OriginDrawer open={open} triggerRect={rect} onClose={() => setOpen(false)}>
- *     {children}
- *   </OriginDrawer>
+ * Strategy: the panel is always `fixed bottom-0`. We set `transform-origin`
+ * to the Y coordinate of the tapped card (expressed as a % of the panel
+ * height from its bottom edge). Closed state = scaleY(0). Open = scaleY(1).
+ * This makes the sheet appear to "grow" from the card outward.
  */
 
 import React, { useEffect, useRef, useState } from 'react';
 
 export interface OriginDrawerProps {
   open: boolean;
-  /** DOMRect of the element that was tapped — captured at tap time */
   triggerRect: DOMRect | null;
   onClose: () => void;
   children: React.ReactNode;
-  /** CSS max-height of the expanded sheet. Default: "70vh" */
-  maxHeight?: string;
+  maxHeight?: string; // default '70vh'
   className?: string;
-}
-
-/**
- * Build the CSS transform for the CLOSED (origin) state.
- *
- * The panel is `fixed bottom-0`, so in its natural position its bottom
- * edge is at viewport bottom. We need to:
- *   1. Scale it down to roughly the card's size.
- *   2. Translate it UP so it appears centred over the card.
- *
- * We estimate panel height from `maxHeight` (default 70% of viewport)
- * rather than measuring the DOM — this gives us the value BEFORE the
- * first paint, eliminating the two-RAF delay.
- */
-function buildClosedTransform(triggerRect: DOMRect, maxHeightPx: number): string {
-  const vh = window.innerHeight;
-  const vw = window.innerWidth;
-
-  const panelH = Math.min(maxHeightPx, vh * 0.95);
-  const panelW = vw; // full width
-
-  // Scale to match card
-  const scaleX = Math.min(1, triggerRect.width  / panelW);
-  const scaleY = Math.min(1, triggerRect.height / panelH);
-
-  // Card centre Y (viewport-relative)
-  const cardCY = triggerRect.top + triggerRect.height / 2;
-
-  // Panel centre Y when sitting at bottom (no translateY applied)
-  const panelCY = vh - panelH / 2;
-
-  // translateY needed so panel centre aligns with card centre
-  // (positive = move down, negative = move up)
-  const ty = cardCY - panelCY;
-
-  return `translateY(${ty.toFixed(1)}px) scaleX(${scaleX.toFixed(4)}) scaleY(${scaleY.toFixed(4)})`;
-}
-
-function parseMaxHeightPx(maxHeight: string): number {
-  if (maxHeight.endsWith('vh')) {
-    return (parseFloat(maxHeight) / 100) * window.innerHeight;
-  }
-  if (maxHeight.endsWith('px')) {
-    return parseFloat(maxHeight);
-  }
-  // fallback
-  return window.innerHeight * 0.7;
 }
 
 export function OriginDrawer({
@@ -84,68 +28,88 @@ export function OriginDrawer({
   maxHeight = '70vh',
   className = '',
 }: OriginDrawerProps) {
-  const panelRef = useRef<HTMLDivElement>(null);
-
-  // Two booleans let us separate mount/unmount from the expand animation
   const [mounted,  setMounted]  = useState(false);
   const [expanded, setExpanded] = useState(false);
+  const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (open) {
       setMounted(true);
-      // Single RAF — panel painted at closed transform, then immediately expand
-      const id = requestAnimationFrame(() => setExpanded(true));
+      // Let browser paint the closed state first, then expand
+      const id = requestAnimationFrame(() => {
+        requestAnimationFrame(() => setExpanded(true));
+      });
       return () => cancelAnimationFrame(id);
     } else {
       setExpanded(false);
-      const t = setTimeout(() => setMounted(false), 320);
+      const t = setTimeout(() => setMounted(false), 300);
       return () => clearTimeout(t);
     }
   }, [open]);
 
   if (!mounted) return null;
 
-  // Derive closed transform synchronously from known triggerRect
-  const closedTransform =
-    triggerRect && typeof window !== 'undefined'
-      ? buildClosedTransform(triggerRect, parseMaxHeightPx(maxHeight))
-      : 'translateY(100%)';
+  /**
+   * Compute transform-origin Y as a pixel offset from the panel's BOTTOM edge.
+   * The panel is fixed-bottom, so its bottom = viewport bottom.
+   * Card centre Y from viewport bottom = (vh - cardCentreY).
+   * We express this as "Xpx from bottom" using "50% calc(100% - Ypx)" syntax.
+   *
+   * transform-origin: "50% YfromTop" where YfromTop is card centre Y.
+   * Since the panel is bottom-anchored, card centre relative to panel top:
+   *   panelTop ≈ vh - panelHeight
+   *   originY  = cardCentreY - panelTop  (can be negative = above panel)
+   * Clamped to [0, panelHeight] so origin stays inside panel.
+   */
+  let transformOriginY = '100%'; // default: grow from bottom
 
-  const panelTransform = expanded
-    ? 'translateY(0px) scaleX(1) scaleY(1)'
-    : closedTransform;
+  if (triggerRect && typeof window !== 'undefined') {
+    const vh = window.innerHeight;
+    const maxHeightPx = maxHeight.endsWith('vh')
+      ? (parseFloat(maxHeight) / 100) * vh
+      : parseFloat(maxHeight);
+    const panelHeight = Math.min(maxHeightPx, vh);
+    const panelTop    = vh - panelHeight;
+    const cardCentreY = triggerRect.top + triggerRect.height / 2;
+    const originY     = Math.max(0, Math.min(panelHeight, cardCentreY - panelTop));
+    transformOriginY  = `${originY.toFixed(1)}px`;
+  }
 
   return (
     <>
-      {/* Dim overlay */}
+      {/* Overlay */}
       <div
-        className="fixed inset-0 z-40 bg-black/40 transition-opacity duration-300"
-        style={{ opacity: expanded ? 1 : 0 }}
+        className="fixed inset-0 z-40 bg-black/40"
+        style={{
+          opacity: expanded ? 1 : 0,
+          transition: 'opacity 280ms ease',
+          pointerEvents: expanded ? 'auto' : 'none',
+        }}
         onClick={onClose}
         aria-hidden="true"
       />
 
-      {/* Panel — starts at card position, expands to full sheet */}
+      {/* Sheet */}
       <div
         ref={panelRef}
         role="dialog"
         aria-modal="true"
-        style={{
-          transform: panelTransform,
-          transition: expanded
-            ? 'transform 320ms cubic-bezier(0.32, 0.72, 0, 1), opacity 200ms ease'
-            : 'transform 220ms ease-in, opacity 150ms ease',
-          transformOrigin: 'bottom center',
-          maxHeight,
-          willChange: 'transform, opacity',
-          opacity: expanded ? 1 : 0.6,
-        }}
         className={[
           'fixed bottom-0 left-0 right-0 z-50',
           'bg-white rounded-t-2xl shadow-xl',
           'flex flex-col overflow-hidden',
           className,
         ].join(' ')}
+        style={{
+          maxHeight,
+          transformOrigin: `50% ${transformOriginY}`,
+          transform: expanded ? 'scaleY(1)' : 'scaleY(0)',
+          opacity: expanded ? 1 : 0,
+          transition: expanded
+            ? 'transform 300ms cubic-bezier(0.34, 1.56, 0.64, 1), opacity 200ms ease'
+            : 'transform 220ms ease-in, opacity 180ms ease',
+          willChange: 'transform, opacity',
+        }}
       >
         {children}
       </div>
