@@ -1,12 +1,17 @@
 'use client';
 
 /**
- * OriginDrawer — true FLIP animation.
+ * OriginDrawer — FLIP animation with content-driven height.
  *
- * FIRST  : panel renders at exact triggerRect (top, left, width, height)
- * LAST   : final layout = fixed bottom-0, full width, maxHeight
- * INVERT : compute translate+scale from FIRST → LAST
- * PLAY   : remove the invert transform, CSS transition does the work
+ * The panel uses height:auto + max-height so it hugs content.
+ * We measure its actual rendered size AFTER the first paint,
+ * then compute the FLIP invert transform from real dimensions.
+ *
+ * FIRST  : panel renders at bottom (identity), transition:none, opacity:0
+ *          → we measure its real rect here via useLayoutEffect
+ * INVERT : apply translate+scale to move panel to triggerRect visually
+ *          still transition:none — snap instantly to card position
+ * PLAY   : remove transform → CSS transition carries it to final position
  */
 
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
@@ -16,93 +21,101 @@ export interface OriginDrawerProps {
   triggerRect: DOMRect | null;
   onClose: () => void;
   children: React.ReactNode;
-  maxHeight?: string; // default '70vh'
+  /** CSS max-height for the panel. Default: '90vh' */
+  maxHeight?: string;
   className?: string;
 }
 
-type Phase = 'unmounted' | 'first' | 'play' | 'closing';
+type Phase =
+  | 'unmounted'   // not in DOM
+  | 'measure'     // in DOM at natural position, invisible — we read its size
+  | 'first'       // transform snapped to card, still no transition
+  | 'play'        // transform animating to identity
+  | 'closing';    // transform animating back to card
 
 export function OriginDrawer({
   open,
   triggerRect,
   onClose,
   children,
-  maxHeight = '70vh',
+  maxHeight = '90vh',
   className = '',
 }: OriginDrawerProps) {
-  const [phase, setPhase] = useState<Phase>('unmounted');
+  const [phase, setPhase]         = useState<Phase>('unmounted');
+  const [invertTx, setInvertTx]   = useState(0);
+  const [invertTy, setInvertTy]   = useState(0);
+  const [invertSx, setInvertSx]   = useState(1);
+  const [invertSy, setInvertSy]   = useState(1);
   const panelRef = useRef<HTMLDivElement>(null);
 
+  // Open/close state driver
   useEffect(() => {
     if (open) {
-      setPhase('first');  // render panel at card position
+      setPhase('measure');
     } else {
-      if (phase === 'play') {
-        setPhase('closing');
-        setTimeout(() => setPhase('unmounted'), 280);
-      } else {
-        setPhase('unmounted');
-      }
+      setPhase((prev) => {
+        if (prev === 'play' || prev === 'first') {
+          setTimeout(() => setPhase('unmounted'), 280);
+          return 'closing';
+        }
+        return 'unmounted';
+      });
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
-  // After 'first' paint, kick to 'play' in next frame
+  // After 'measure' paint: read real rect, compute invert, snap to 'first'
   useLayoutEffect(() => {
-    if (phase === 'first') {
-      const id = requestAnimationFrame(() => setPhase('play'));
-      return () => cancelAnimationFrame(id);
-    }
-  }, [phase]);
+    if (phase !== 'measure') return;
+    if (!panelRef.current || !triggerRect) return;
 
-  if (phase === 'unmounted' || !triggerRect) return null;
+    const finalRect = panelRef.current.getBoundingClientRect();
 
-  const vh = typeof window !== 'undefined' ? window.innerHeight : 800;
-  const vw = typeof window !== 'undefined' ? window.innerWidth  : 400;
+    // centre-to-centre delta
+    const tx = triggerRect.left + triggerRect.width  / 2 - (finalRect.left + finalRect.width  / 2);
+    const ty = triggerRect.top  + triggerRect.height / 2 - (finalRect.top  + finalRect.height / 2);
+    const sx = triggerRect.width  / finalRect.width;
+    const sy = triggerRect.height / finalRect.height;
 
-  // ── LAST position: full-width bottom sheet ──────────────────────────────
-  const maxHeightPx = maxHeight.endsWith('vh')
-    ? (parseFloat(maxHeight) / 100) * vh
-    : parseFloat(maxHeight);
+    setInvertTx(tx);
+    setInvertTy(ty);
+    setInvertSx(sx);
+    setInvertSy(sy);
 
-  const finalW = vw;
-  const finalH = maxHeightPx;
-  const finalX = 0;                    // left edge
-  const finalY = vh - finalH;          // top edge of panel
+    // Snap to card (no transition) then immediately play
+    setPhase('first');
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => setPhase('play'));
+    });
+  }, [phase, triggerRect]);
 
-  // ── FIRST position: matches triggerRect exactly ─────────────────────────
-  const firstX = triggerRect.left;
-  const firstY = triggerRect.top;
-  const firstW = triggerRect.width;
-  const firstH = triggerRect.height;
+  if (phase === 'unmounted') return null;
 
-  // ── INVERT transform: how to move LAST → FIRST ─────────────────────────
-  //   panel renders at LAST dimensions; we invert it to FIRST via transform
-  const invertTX    = firstX + firstW / 2 - (finalX + finalW / 2);  // centre-to-centre
-  const invertTY    = firstY + firstH / 2 - (finalY + finalH / 2);
-  const invertScaleX = firstW / finalW;
-  const invertScaleY = firstH / finalH;
-
-  const invertTransform =
-    `translate(${invertTX.toFixed(2)}px, ${invertTY.toFixed(2)}px)` +
-    ` scale(${invertScaleX.toFixed(4)}, ${invertScaleY.toFixed(4)})`;
-
-  const isFirst   = phase === 'first';
   const isClosing = phase === 'closing';
+  const isMeasure = phase === 'measure';
+  const isFirst   = phase === 'first';
   const isPlay    = phase === 'play';
 
-  // During FIRST and CLOSING, apply invert; during PLAY, identity
-  const panelTransform  = (isFirst || isClosing) ? invertTransform : 'translate(0,0) scale(1,1)';
-  const panelOpacity    = (isFirst || isClosing) ? 0.5 : 1;
-  const overlayOpacity  = isPlay ? 1 : 0;
+  const invertTransform =
+    `translate(${invertTx.toFixed(2)}px, ${invertTy.toFixed(2)}px)` +
+    ` scale(${invertSx.toFixed(4)}, ${invertSy.toFixed(4)})`;
+
+  // measure  : identity transform, invisible (we read size here)
+  // first    : invert transform, no transition (snap to card)
+  // play     : identity transform, transition on (animate to final)
+  // closing  : invert transform, transition on (animate back to card)
+  const panelTransform = (isFirst || isClosing)
+    ? invertTransform
+    : 'translate(0px,0px) scale(1,1)';
+
+  const hasTransition = isPlay || isClosing;
 
   return (
     <>
-      {/* Overlay */}
+      {/* Dim overlay */}
       <div
         className="fixed inset-0 z-40 bg-black/40"
         style={{
-          opacity: overlayOpacity,
+          opacity: isPlay ? 1 : 0,
           transition: 'opacity 280ms ease',
           pointerEvents: isPlay ? 'auto' : 'none',
         }}
@@ -110,33 +123,43 @@ export function OriginDrawer({
         aria-hidden="true"
       />
 
-      {/* Panel — always sized to LAST (final) dimensions */}
+      {/*
+        Outer positioning wrapper — fixed bottom-0, full width.
+        height: auto so it hugs content.
+        max-height caps it and enables internal scroll.
+      */}
       <div
         ref={panelRef}
         role="dialog"
         aria-modal="true"
-        className={[
-          'fixed z-50 bg-white rounded-2xl shadow-xl',
-          'flex flex-col overflow-hidden',
-          className,
-        ].join(' ')}
+        className={['fixed bottom-0 left-0 right-0 z-50', className].join(' ')}
         style={{
-          // LAST geometry
-          left:   finalX,
-          top:    finalY,
-          width:  finalW,
-          height: finalH,
+          // Content-driven sizing
+          height:    'auto',
+          maxHeight,
           // FLIP transform
-          transform:      panelTransform,
+          transform:       panelTransform,
           transformOrigin: 'center center',
-          opacity:   panelOpacity,
-          transition: isFirst
-            ? 'none'   // no transition on first frame — snap to card
-            : 'transform 320ms cubic-bezier(0.34, 1.2, 0.64, 1), opacity 240ms ease',
+          // Visibility
+          opacity: isMeasure ? 0 : 1,
+          // Transition only on play + closing
+          transition: hasTransition
+            ? 'transform 320ms cubic-bezier(0.34, 1.2, 0.64, 1), opacity 240ms ease'
+            : 'none',
           willChange: 'transform, opacity',
         }}
       >
-        {children}
+        {/*
+          Inner layout wrapper — owns the visual chrome + flex column.
+          Separate from the transform wrapper so content is never distorted
+          by scale during the animation.
+        */}
+        <div
+          className="bg-white rounded-t-2xl shadow-xl flex flex-col overflow-hidden"
+          style={{ maxHeight }}
+        >
+          {children}
+        </div>
       </div>
     </>
   );
