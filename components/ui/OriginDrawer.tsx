@@ -1,15 +1,15 @@
 'use client';
 
 /**
- * OriginDrawer — animates a bottom-sheet from the tapped card's position.
+ * OriginDrawer — true FLIP animation.
  *
- * Strategy: the panel is always `fixed bottom-0`. We set `transform-origin`
- * to the Y coordinate of the tapped card (expressed as a % of the panel
- * height from its bottom edge). Closed state = scaleY(0). Open = scaleY(1).
- * This makes the sheet appear to "grow" from the card outward.
+ * FIRST  : panel renders at exact triggerRect (top, left, width, height)
+ * LAST   : final layout = fixed bottom-0, full width, maxHeight
+ * INVERT : compute translate+scale from FIRST → LAST
+ * PLAY   : remove the invert transform, CSS transition does the work
  */
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 export interface OriginDrawerProps {
   open: boolean;
@@ -20,6 +20,8 @@ export interface OriginDrawerProps {
   className?: string;
 }
 
+type Phase = 'unmounted' | 'first' | 'play' | 'closing';
+
 export function OriginDrawer({
   open,
   triggerRect,
@@ -28,52 +30,71 @@ export function OriginDrawer({
   maxHeight = '70vh',
   className = '',
 }: OriginDrawerProps) {
-  const [mounted,  setMounted]  = useState(false);
-  const [expanded, setExpanded] = useState(false);
+  const [phase, setPhase] = useState<Phase>('unmounted');
   const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (open) {
-      setMounted(true);
-      // Let browser paint the closed state first, then expand
-      const id = requestAnimationFrame(() => {
-        requestAnimationFrame(() => setExpanded(true));
-      });
-      return () => cancelAnimationFrame(id);
+      setPhase('first');  // render panel at card position
     } else {
-      setExpanded(false);
-      const t = setTimeout(() => setMounted(false), 300);
-      return () => clearTimeout(t);
+      if (phase === 'play') {
+        setPhase('closing');
+        setTimeout(() => setPhase('unmounted'), 280);
+      } else {
+        setPhase('unmounted');
+      }
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
-  if (!mounted) return null;
+  // After 'first' paint, kick to 'play' in next frame
+  useLayoutEffect(() => {
+    if (phase === 'first') {
+      const id = requestAnimationFrame(() => setPhase('play'));
+      return () => cancelAnimationFrame(id);
+    }
+  }, [phase]);
 
-  /**
-   * Compute transform-origin Y as a pixel offset from the panel's BOTTOM edge.
-   * The panel is fixed-bottom, so its bottom = viewport bottom.
-   * Card centre Y from viewport bottom = (vh - cardCentreY).
-   * We express this as "Xpx from bottom" using "50% calc(100% - Ypx)" syntax.
-   *
-   * transform-origin: "50% YfromTop" where YfromTop is card centre Y.
-   * Since the panel is bottom-anchored, card centre relative to panel top:
-   *   panelTop ≈ vh - panelHeight
-   *   originY  = cardCentreY - panelTop  (can be negative = above panel)
-   * Clamped to [0, panelHeight] so origin stays inside panel.
-   */
-  let transformOriginY = '100%'; // default: grow from bottom
+  if (phase === 'unmounted' || !triggerRect) return null;
 
-  if (triggerRect && typeof window !== 'undefined') {
-    const vh = window.innerHeight;
-    const maxHeightPx = maxHeight.endsWith('vh')
-      ? (parseFloat(maxHeight) / 100) * vh
-      : parseFloat(maxHeight);
-    const panelHeight = Math.min(maxHeightPx, vh);
-    const panelTop    = vh - panelHeight;
-    const cardCentreY = triggerRect.top + triggerRect.height / 2;
-    const originY     = Math.max(0, Math.min(panelHeight, cardCentreY - panelTop));
-    transformOriginY  = `${originY.toFixed(1)}px`;
-  }
+  const vh = typeof window !== 'undefined' ? window.innerHeight : 800;
+  const vw = typeof window !== 'undefined' ? window.innerWidth  : 400;
+
+  // ── LAST position: full-width bottom sheet ──────────────────────────────
+  const maxHeightPx = maxHeight.endsWith('vh')
+    ? (parseFloat(maxHeight) / 100) * vh
+    : parseFloat(maxHeight);
+
+  const finalW = vw;
+  const finalH = maxHeightPx;
+  const finalX = 0;                    // left edge
+  const finalY = vh - finalH;          // top edge of panel
+
+  // ── FIRST position: matches triggerRect exactly ─────────────────────────
+  const firstX = triggerRect.left;
+  const firstY = triggerRect.top;
+  const firstW = triggerRect.width;
+  const firstH = triggerRect.height;
+
+  // ── INVERT transform: how to move LAST → FIRST ─────────────────────────
+  //   panel renders at LAST dimensions; we invert it to FIRST via transform
+  const invertTX    = firstX + firstW / 2 - (finalX + finalW / 2);  // centre-to-centre
+  const invertTY    = firstY + firstH / 2 - (finalY + finalH / 2);
+  const invertScaleX = firstW / finalW;
+  const invertScaleY = firstH / finalH;
+
+  const invertTransform =
+    `translate(${invertTX.toFixed(2)}px, ${invertTY.toFixed(2)}px)` +
+    ` scale(${invertScaleX.toFixed(4)}, ${invertScaleY.toFixed(4)})`;
+
+  const isFirst   = phase === 'first';
+  const isClosing = phase === 'closing';
+  const isPlay    = phase === 'play';
+
+  // During FIRST and CLOSING, apply invert; during PLAY, identity
+  const panelTransform  = (isFirst || isClosing) ? invertTransform : 'translate(0,0) scale(1,1)';
+  const panelOpacity    = (isFirst || isClosing) ? 0.5 : 1;
+  const overlayOpacity  = isPlay ? 1 : 0;
 
   return (
     <>
@@ -81,33 +102,37 @@ export function OriginDrawer({
       <div
         className="fixed inset-0 z-40 bg-black/40"
         style={{
-          opacity: expanded ? 1 : 0,
+          opacity: overlayOpacity,
           transition: 'opacity 280ms ease',
-          pointerEvents: expanded ? 'auto' : 'none',
+          pointerEvents: isPlay ? 'auto' : 'none',
         }}
         onClick={onClose}
         aria-hidden="true"
       />
 
-      {/* Sheet */}
+      {/* Panel — always sized to LAST (final) dimensions */}
       <div
         ref={panelRef}
         role="dialog"
         aria-modal="true"
         className={[
-          'fixed bottom-0 left-0 right-0 z-50',
-          'bg-white rounded-t-2xl shadow-xl',
+          'fixed z-50 bg-white rounded-2xl shadow-xl',
           'flex flex-col overflow-hidden',
           className,
         ].join(' ')}
         style={{
-          maxHeight,
-          transformOrigin: `50% ${transformOriginY}`,
-          transform: expanded ? 'scaleY(1)' : 'scaleY(0)',
-          opacity: expanded ? 1 : 0,
-          transition: expanded
-            ? 'transform 300ms cubic-bezier(0.34, 1.56, 0.64, 1), opacity 200ms ease'
-            : 'transform 220ms ease-in, opacity 180ms ease',
+          // LAST geometry
+          left:   finalX,
+          top:    finalY,
+          width:  finalW,
+          height: finalH,
+          // FLIP transform
+          transform:      panelTransform,
+          transformOrigin: 'center center',
+          opacity:   panelOpacity,
+          transition: isFirst
+            ? 'none'   // no transition on first frame — snap to card
+            : 'transform 320ms cubic-bezier(0.34, 1.2, 0.64, 1), opacity 240ms ease',
           willChange: 'transform, opacity',
         }}
       >
