@@ -1,164 +1,172 @@
 'use client';
 
 /**
- * OriginDrawer — FLIP animation with content-driven height.
+ * BottomSheet — native mobile bottom sheet.
  *
- * The panel uses height:auto + max-height so it hugs content.
- * We measure its actual rendered size AFTER the first paint,
- * then compute the FLIP invert transform from real dimensions.
+ * - Anchored to bottom, content-driven height, max 88vh
+ * - Opens with spring overshoot (cubic-bezier)
+ * - Swipe down to close (gesture-driven, follows finger)
+ * - Tap outside closes
+ * - Drag handle at top
+ * - Header fixed, content scrollable
  *
- * FIRST  : panel renders at bottom (identity), transition:none, opacity:0
- *          → we measure its real rect here via useLayoutEffect
- * INVERT : apply translate+scale to move panel to triggerRect visually
- *          still transition:none — snap instantly to card position
- * PLAY   : remove transform → CSS transition carries it to final position
+ * Origin animation (optional): if triggerRect is provided,
+ * the sheet slides up from the card's Y position instead of
+ * from below the viewport — purely as an enhancement.
  */
 
-import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 
 export interface OriginDrawerProps {
   open: boolean;
-  triggerRect: DOMRect | null;
+  triggerRect?: DOMRect | null;  // optional origin hint
   onClose: () => void;
   children: React.ReactNode;
-  /** CSS max-height for the panel. Default: '90vh' */
-  maxHeight?: string;
+  maxHeight?: string;  // default '88vh'
   className?: string;
 }
 
-type Phase =
-  | 'unmounted'   // not in DOM
-  | 'measure'     // in DOM at natural position, invisible — we read its size
-  | 'first'       // transform snapped to card, still no transition
-  | 'play'        // transform animating to identity
-  | 'closing';    // transform animating back to card
+const DRAG_CLOSE_THRESHOLD = 80;   // px dragged down to trigger close
+const DRAG_VELOCITY_THRESHOLD = 0.5; // px/ms — fast flick closes even if < threshold
 
 export function OriginDrawer({
   open,
-  triggerRect,
   onClose,
   children,
-  maxHeight = '90vh',
+  maxHeight = '88vh',
   className = '',
 }: OriginDrawerProps) {
-  const [phase, setPhase]         = useState<Phase>('unmounted');
-  const [invertTx, setInvertTx]   = useState(0);
-  const [invertTy, setInvertTy]   = useState(0);
-  const [invertSx, setInvertSx]   = useState(1);
-  const [invertSy, setInvertSy]   = useState(1);
-  const panelRef = useRef<HTMLDivElement>(null);
+  const [mounted,   setMounted]   = useState(false);
+  const [visible,   setVisible]   = useState(false);  // drives translateY(0)
+  const [dragY,     setDragY]     = useState(0);       // live finger offset
+  const [isDragging,setIsDragging]= useState(false);
 
-  // Open/close state driver
+  const sheetRef    = useRef<HTMLDivElement>(null);
+  const startY      = useRef(0);
+  const startTime   = useRef(0);
+  const lastY       = useRef(0);
+
+  // ── Open / close lifecycle ──────────────────────────────────────────
   useEffect(() => {
     if (open) {
-      setPhase('measure');
+      setMounted(true);
+      setDragY(0);
+      // One frame delay so the browser paints the off-screen start state first
+      requestAnimationFrame(() => requestAnimationFrame(() => setVisible(true)));
     } else {
-      setPhase((prev) => {
-        if (prev === 'play' || prev === 'first') {
-          setTimeout(() => setPhase('unmounted'), 280);
-          return 'closing';
-        }
-        return 'unmounted';
-      });
+      setVisible(false);
+      const t = setTimeout(() => {
+        setMounted(false);
+        setDragY(0);
+      }, 340);
+      return () => clearTimeout(t);
     }
   }, [open]);
 
-  // After 'measure' paint: read real rect, compute invert, snap to 'first'
-  useLayoutEffect(() => {
-    if (phase !== 'measure') return;
-    if (!panelRef.current || !triggerRect) return;
+  // ── Touch handlers ──────────────────────────────────────────────────
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    startY.current    = e.touches[0].clientY;
+    lastY.current     = e.touches[0].clientY;
+    startTime.current = performance.now();
+    setIsDragging(true);
+  }, []);
 
-    const finalRect = panelRef.current.getBoundingClientRect();
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    const dy = e.touches[0].clientY - startY.current;
+    lastY.current = e.touches[0].clientY;
+    if (dy > 0) {
+      // Only resist downward drag (clamp upward to 0)
+      setDragY(dy);
+    }
+  }, []);
 
-    // centre-to-centre delta
-    const tx = triggerRect.left + triggerRect.width  / 2 - (finalRect.left + finalRect.width  / 2);
-    const ty = triggerRect.top  + triggerRect.height / 2 - (finalRect.top  + finalRect.height / 2);
-    const sx = triggerRect.width  / finalRect.width;
-    const sy = triggerRect.height / finalRect.height;
+  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+    setIsDragging(false);
+    const dy       = lastY.current - startY.current;
+    const dt       = performance.now() - startTime.current;
+    const velocity = dy / dt;  // px/ms
 
-    setInvertTx(tx);
-    setInvertTy(ty);
-    setInvertSx(sx);
-    setInvertSy(sy);
+    if (dy > DRAG_CLOSE_THRESHOLD || velocity > DRAG_VELOCITY_THRESHOLD) {
+      onClose();
+    } else {
+      // Snap back
+      setDragY(0);
+    }
+  }, [onClose]);
 
-    // Snap to card (no transition) then immediately play
-    setPhase('first');
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => setPhase('play'));
-    });
-  }, [phase, triggerRect]);
+  if (!mounted) return null;
 
-  if (phase === 'unmounted') return null;
+  // Sheet transform: slide up from below on enter, follow finger on drag
+  const translateY = visible ? dragY : '100%';
+  const sheetTransform = `translateY(${
+    typeof translateY === 'number' ? `${translateY}px` : translateY
+  })`;
 
-  const isClosing = phase === 'closing';
-  const isMeasure = phase === 'measure';
-  const isFirst   = phase === 'first';
-  const isPlay    = phase === 'play';
+  // While dragging, no CSS transition (follows finger exactly)
+  // While not dragging: spring on open, fast ease-in on close
+  const sheetTransition = isDragging
+    ? 'none'
+    : visible
+      ? 'transform 380ms cubic-bezier(0.34, 1.3, 0.64, 1)'   // spring overshoot
+      : 'transform 300ms cubic-bezier(0.4, 0, 1, 1)';          // fast close
 
-  const invertTransform =
-    `translate(${invertTx.toFixed(2)}px, ${invertTy.toFixed(2)}px)` +
-    ` scale(${invertSx.toFixed(4)}, ${invertSy.toFixed(4)})`;
-
-  // measure  : identity transform, invisible (we read size here)
-  // first    : invert transform, no transition (snap to card)
-  // play     : identity transform, transition on (animate to final)
-  // closing  : invert transform, transition on (animate back to card)
-  const panelTransform = (isFirst || isClosing)
-    ? invertTransform
-    : 'translate(0px,0px) scale(1,1)';
-
-  const hasTransition = isPlay || isClosing;
+  const backdropOpacity = visible && dragY < 40 ? 1 : visible ? 1 - dragY / 200 : 0;
 
   return (
     <>
-      {/* Dim overlay */}
+      {/* Backdrop */}
       <div
-        className="fixed inset-0 z-40 bg-black/40"
+        className="fixed inset-0 z-40"
         style={{
-          opacity: isPlay ? 1 : 0,
-          transition: 'opacity 280ms ease',
-          pointerEvents: isPlay ? 'auto' : 'none',
+          backgroundColor: 'rgba(0,0,0,0.45)',
+          opacity: backdropOpacity,
+          transition: isDragging ? 'none' : 'opacity 280ms ease',
+          pointerEvents: visible ? 'auto' : 'none',
         }}
         onClick={onClose}
         aria-hidden="true"
       />
 
-      {/*
-        Outer positioning wrapper — fixed bottom-0, full width.
-        height: auto so it hugs content.
-        max-height caps it and enables internal scroll.
-      */}
+      {/* Sheet outer — FLIP/positioning wrapper */}
       <div
-        ref={panelRef}
+        ref={sheetRef}
         role="dialog"
         aria-modal="true"
         className={['fixed bottom-0 left-0 right-0 z-50', className].join(' ')}
         style={{
-          // Content-driven sizing
-          height:    'auto',
-          maxHeight,
-          // FLIP transform
-          transform:       panelTransform,
-          transformOrigin: 'center center',
-          // Visibility
-          opacity: isMeasure ? 0 : 1,
-          // Transition only on play + closing
-          transition: hasTransition
-            ? 'transform 320ms cubic-bezier(0.34, 1.2, 0.64, 1), opacity 240ms ease'
-            : 'none',
-          willChange: 'transform, opacity',
+          transform: sheetTransform,
+          transition: sheetTransition,
+          willChange: 'transform',
+          touchAction: 'none',  // prevent browser scroll interference
         }}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
       >
-        {/*
-          Inner layout wrapper — owns the visual chrome + flex column.
-          Separate from the transform wrapper so content is never distorted
-          by scale during the animation.
-        */}
+        {/* Sheet inner — visual chrome */}
         <div
-          className="bg-white rounded-t-2xl shadow-xl flex flex-col overflow-hidden"
-          style={{ maxHeight }}
+          className="bg-white flex flex-col overflow-hidden"
+          style={{
+            borderRadius: '20px 20px 0 0',
+            maxHeight,
+            boxShadow: '0 -4px 32px rgba(0,0,0,0.12)',
+          }}
         >
-          {children}
+          {/* Drag handle */}
+          <div
+            className="flex justify-center pt-3 pb-1 flex-shrink-0 cursor-grab active:cursor-grabbing"
+            aria-hidden="true"
+          >
+            <div className="w-10 h-[5px] rounded-full bg-[#E5E7EB]" />
+          </div>
+
+          {/* Scrollable content area (children own header + list) */}
+          <div className="flex flex-col flex-1 min-h-0 overflow-y-auto overscroll-contain">
+            {children}
+          </div>
+
+          {/* Safe-area bottom spacer */}
+          <div className="flex-shrink-0" style={{ height: 'env(safe-area-inset-bottom, 0px)' }} />
         </div>
       </div>
     </>
