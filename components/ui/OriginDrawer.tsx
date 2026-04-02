@@ -1,16 +1,13 @@
 'use client';
 
 /**
- * OriginDrawer — reusable origin-based drawer pattern.
- *
- * Captures the DOMRect of the trigger element and animates from that
- * position into a full bottom-sheet (mobile) or floating panel (desktop).
+ * OriginDrawer — origin-based drawer that animates FROM the tapped card.
  *
  * Usage:
  *   const [rect, setRect] = useState<DOMRect | null>(null)
  *   const [open, setOpen] = useState(false)
  *
- *   <button ref={el => el && setRect(el.getBoundingClientRect())} onClick={() => setOpen(true)}>
+ *   <button onClick={e => { setRect(e.currentTarget.getBoundingClientRect()); setOpen(true) }}>
  *     Open
  *   </button>
  *
@@ -21,53 +18,62 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 
-interface OriginDrawerProps {
+export interface OriginDrawerProps {
   open: boolean;
+  /** DOMRect of the element that was tapped — captured at tap time */
   triggerRect: DOMRect | null;
   onClose: () => void;
   children: React.ReactNode;
-  /** Max height of the expanded sheet (default: 70vh) */
+  /** CSS max-height of the expanded sheet. Default: "70vh" */
   maxHeight?: string;
   className?: string;
 }
 
 /**
- * Compute the CSS transform that places the drawer panel
- * at the same visual origin as the trigger element, then
- * transitions it to its natural (full) position.
+ * Build the CSS transform for the CLOSED (origin) state.
  *
- * Strategy:
- *   1. The drawer panel is fixed at the bottom of the viewport.
- *   2. In the CLOSED (origin) state, we apply a translateY so the
- *      panel appears to sit at the vertical centre of the trigger rect,
- *      combined with a scale-down that shrinks it to the trigger's width.
- *   3. In the OPEN state, transform is reset to identity.
+ * The panel is `fixed bottom-0`, so in its natural position its bottom
+ * edge is at viewport bottom. We need to:
+ *   1. Scale it down to roughly the card's size.
+ *   2. Translate it UP so it appears centred over the card.
+ *
+ * We estimate panel height from `maxHeight` (default 70% of viewport)
+ * rather than measuring the DOM — this gives us the value BEFORE the
+ * first paint, eliminating the two-RAF delay.
  */
-function computeOriginTransform(
-  triggerRect: DOMRect,
-  panelRef: React.RefObject<HTMLDivElement>,
-): { translateY: number; scaleX: number; scaleY: number } {
-  const panel = panelRef.current;
-  if (!panel) return { translateY: 0, scaleX: 1, scaleY: 1 };
+function buildClosedTransform(triggerRect: DOMRect, maxHeightPx: number): string {
+  const vh = window.innerHeight;
+  const vw = window.innerWidth;
 
-  const panelRect = panel.getBoundingClientRect();
-  const viewportH = window.innerHeight;
+  const panelH = Math.min(maxHeightPx, vh * 0.95);
+  const panelW = vw; // full width
 
-  // Trigger vertical centre relative to viewport
-  const triggerCentreY = triggerRect.top + triggerRect.height / 2;
+  // Scale to match card
+  const scaleX = Math.min(1, triggerRect.width  / panelW);
+  const scaleY = Math.min(1, triggerRect.height / panelH);
 
-  // Panel currently sits at the bottom; its top edge:
-  const panelTopY = viewportH - panelRect.height;
+  // Card centre Y (viewport-relative)
+  const cardCY = triggerRect.top + triggerRect.height / 2;
 
-  // How far up we need to push the panel so its centre aligns with trigger centre
-  const panelCentreY = panelTopY + panelRect.height / 2;
-  const translateY   = triggerCentreY - panelCentreY;
+  // Panel centre Y when sitting at bottom (no translateY applied)
+  const panelCY = vh - panelH / 2;
 
-  // Scale to match trigger card dimensions
-  const scaleX = Math.min(1, triggerRect.width  / panelRect.width);
-  const scaleY = Math.min(1, triggerRect.height / panelRect.height);
+  // translateY needed so panel centre aligns with card centre
+  // (positive = move down, negative = move up)
+  const ty = cardCY - panelCY;
 
-  return { translateY, scaleX, scaleY };
+  return `translateY(${ty.toFixed(1)}px) scaleX(${scaleX.toFixed(4)}) scaleY(${scaleY.toFixed(4)})`;
+}
+
+function parseMaxHeightPx(maxHeight: string): number {
+  if (maxHeight.endsWith('vh')) {
+    return (parseFloat(maxHeight) / 100) * window.innerHeight;
+  }
+  if (maxHeight.endsWith('px')) {
+    return parseFloat(maxHeight);
+  }
+  // fallback
+  return window.innerHeight * 0.7;
 }
 
 export function OriginDrawer({
@@ -78,26 +84,20 @@ export function OriginDrawer({
   maxHeight = '70vh',
   className = '',
 }: OriginDrawerProps) {
-  const panelRef  = useRef<HTMLDivElement>(null);
-  const [mounted, setMounted]   = useState(false); // after first paint
-  const [visible, setVisible]   = useState(false); // controls opacity overlay
-  const [expanded, setExpanded] = useState(false); // controls panel transform
+  const panelRef = useRef<HTMLDivElement>(null);
 
-  // Phase 1: mount invisible panel
+  // Two booleans let us separate mount/unmount from the expand animation
+  const [mounted,  setMounted]  = useState(false);
+  const [expanded, setExpanded] = useState(false);
+
   useEffect(() => {
     if (open) {
       setMounted(true);
-      // Wait one frame for panel to paint so we can measure it
-      const raf = requestAnimationFrame(() => {
-        setVisible(true);
-        // Then expand in next frame
-        requestAnimationFrame(() => setExpanded(true));
-      });
-      return () => cancelAnimationFrame(raf);
+      // Single RAF — panel painted at closed transform, then immediately expand
+      const id = requestAnimationFrame(() => setExpanded(true));
+      return () => cancelAnimationFrame(id);
     } else {
-      // Collapse then unmount
       setExpanded(false);
-      setVisible(false);
       const t = setTimeout(() => setMounted(false), 320);
       return () => clearTimeout(t);
     }
@@ -105,14 +105,15 @@ export function OriginDrawer({
 
   if (!mounted) return null;
 
-  // Compute origin transform (closed state)
-  let originTransform = 'translateY(100%)';
-  if (triggerRect && panelRef.current && visible) {
-    const { translateY, scaleX, scaleY } = computeOriginTransform(triggerRect, panelRef);
-    originTransform = `translateY(calc(100% + ${translateY}px)) scaleX(${scaleX.toFixed(4)}) scaleY(${scaleY.toFixed(4)})`;
-  }
+  // Derive closed transform synchronously from known triggerRect
+  const closedTransform =
+    triggerRect && typeof window !== 'undefined'
+      ? buildClosedTransform(triggerRect, parseMaxHeightPx(maxHeight))
+      : 'translateY(100%)';
 
-  const panelTransform = expanded ? 'translateY(0) scaleX(1) scaleY(1)' : originTransform;
+  const panelTransform = expanded
+    ? 'translateY(0px) scaleX(1) scaleY(1)'
+    : closedTransform;
 
   return (
     <>
@@ -124,7 +125,7 @@ export function OriginDrawer({
         aria-hidden="true"
       />
 
-      {/* Drawer panel */}
+      {/* Panel — starts at card position, expands to full sheet */}
       <div
         ref={panelRef}
         role="dialog"
@@ -132,11 +133,12 @@ export function OriginDrawer({
         style={{
           transform: panelTransform,
           transition: expanded
-            ? 'transform 300ms cubic-bezier(0.32, 0.72, 0, 1)'
-            : 'transform 250ms ease-in',
+            ? 'transform 320ms cubic-bezier(0.32, 0.72, 0, 1), opacity 200ms ease'
+            : 'transform 220ms ease-in, opacity 150ms ease',
           transformOrigin: 'bottom center',
           maxHeight,
-          willChange: 'transform',
+          willChange: 'transform, opacity',
+          opacity: expanded ? 1 : 0.6,
         }}
         className={[
           'fixed bottom-0 left-0 right-0 z-50',
