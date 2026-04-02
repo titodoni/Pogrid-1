@@ -1,38 +1,21 @@
 'use client';
 export const dynamic = 'force-dynamic';
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
-  Pencil,
-  ShoppingCart,
-  Settings,
-  Flame,
-  ShieldCheck,
-  Truck,
-  Cog,
-  BarChart2,
-  Briefcase,
-  Phone,
-  Mail,
-  MessageCircle,
-  X,
-  ChevronLeft,
+  Pencil, ShoppingCart, Settings, Flame, ShieldCheck,
+  Truck, Cog, BarChart2, Briefcase,
+  Phone, Mail, MessageCircle, X, ChevronLeft,
   type LucideIcon,
 } from 'lucide-react';
 import { mockUsers } from '@/lib/mockData';
 import useUIStore from '@/store/uiStore';
 import { OriginDrawer } from '@/components/ui/OriginDrawer';
 
-// ─── Helpers ───────────────────────────────────────────────────────────────
-
 function getInitials(name: string): string {
   const parts = name.trim().split(' ');
-  const first = parts[0]?.[0] ?? '';
-  const last  = parts[parts.length - 1]?.[0] ?? '';
-  return (first + last).toUpperCase();
+  return ((parts[0]?.[0] ?? '') + (parts[parts.length - 1]?.[0] ?? '')).toUpperCase();
 }
-
-// ─── Dept config ───────────────────────────────────────────────────────────────
 
 const DEPT_CARDS: { name: string; icon: LucideIcon }[] = [
   { name: 'Drafting',   icon: Pencil },
@@ -46,8 +29,17 @@ const DEPT_CARDS: { name: string; icon: LucideIcon }[] = [
   { name: 'Sales',      icon: Briefcase },
 ];
 
-// ─── ForgotPinSheet ───────────────────────────────────────────────────────────
+// ─── close helper — single source of truth ─────────────────────────────────────────
+// exported so it can also be called from navigation
+function makeCloseDrawer(
+  set: (fn: (prev: { open: boolean; dept: string | null }) =>
+    { open: boolean; dept: string | null }) => void
+) {
+  return () =>
+    set(() => ({ open: false, dept: null }));
+}
 
+// ─── ForgotPinSheet ───────────────────────────────────────────────────────────
 function ForgotPinSheet({ onClose }: { onClose: () => void }) {
   return (
     <>
@@ -88,205 +80,153 @@ function ForgotPinSheet({ onClose }: { onClose: () => void }) {
   );
 }
 
-// ─── DepartmentGrid ─────────────────────────────────────────────────────────────
-
-interface DepartmentGridProps {
+// ─── DepartmentGrid ───────────────────────────────────────────────────────────
+function DepartmentGrid({
+  selectedDept,
+  onCardTap,
+}: {
   selectedDept: string | null;
   onCardTap: (name: string, rect: DOMRect) => void;
-}
-
-function DepartmentGrid({ selectedDept, onCardTap }: DepartmentGridProps) {
-  // Store refs by dept name to capture each card's DOMRect
+}) {
   const cardRefs = useRef<Record<string, HTMLButtonElement | null>>({});
-
   function handleTap(name: string) {
-    const el = cardRefs.current[name];
+    const el   = cardRefs.current[name];
     const rect = el?.getBoundingClientRect() ?? null;
     if (rect) onCardTap(name, rect);
   }
-
   return (
     <div className="grid grid-cols-3 gap-3">
-      {DEPT_CARDS.map(({ name, icon: Icon }) => {
-        const isSelected = selectedDept === name;
-        return (
-          <button
-            key={name}
-            type="button"
-            ref={(el) => { cardRefs.current[name] = el; }}
-            onClick={() => handleTap(name)}
-            className={[
-              'bg-white rounded-xl border border-[#E5E7EB] shadow-sm',
-              'p-3 flex flex-col items-center justify-center gap-2',
-              'min-h-[80px] min-w-[56px] cursor-pointer select-none',
-              'transition-all duration-150',
-              isSelected
-                ? 'scale-[1.04] shadow-md border-[#2A7B76]'
-                : 'hover:scale-[1.02]',
-            ].join(' ')}
-          >
-            <Icon size={32} className="text-[#2A7B76]" />
-            <span className="text-[14px] font-medium text-[#1A1A2E] leading-tight text-center">
-              {name}
-            </span>
-          </button>
-        );
-      })}
+      {DEPT_CARDS.map(({ name, icon: Icon }) => (
+        <button
+          key={name}
+          type="button"
+          ref={(el) => { cardRefs.current[name] = el; }}
+          onClick={() => handleTap(name)}
+          className={[
+            'bg-white rounded-xl border shadow-sm p-3',
+            'flex flex-col items-center justify-center gap-2',
+            'min-h-[80px] cursor-pointer select-none transition-all duration-150',
+            selectedDept === name
+              ? 'scale-[1.04] shadow-md border-[#2A7B76]'
+              : 'border-[#E5E7EB] hover:scale-[1.02]',
+          ].join(' ')}
+        >
+          <Icon size={32} className="text-[#2A7B76]" />
+          <span className="text-[14px] font-medium text-[#1A1A2E] leading-tight text-center">{name}</span>
+        </button>
+      ))}
     </div>
   );
 }
 
-// ─── UserDrawerContent (rendered inside OriginDrawer) ─────────────────────────────
-
-function UserDrawerContent({
-  deptName,
-  onClose,
-}: {
-  deptName: string;
-  onClose: () => void;
-}) {
+// ─── UserDrawerContent ──────────────────────────────────────────────────────────
+function UserDrawerContent({ deptName, onClose }: { deptName: string; onClose: () => void }) {
   const users = mockUsers.filter((u) => u.department === deptName);
 
   function handleUserTap(user: (typeof mockUsers)[number]) {
+    // Close drawer + clear state before navigation
+    onClose();
     useUIStore.getState().setSession({
-      userId: user.id,
-      name: user.name,
-      department: user.department,
-      role: user.role,
-      isLoggedIn: true,
+      userId: user.id, name: user.name,
+      department: user.department, role: user.role, isLoggedIn: true,
     });
-    window.location.href = '/login';
+    // Small delay so close animation starts before page unloads
+    setTimeout(() => { window.location.href = '/login'; }, 80);
   }
 
   return (
     <>
-      {/* Drag handle */}
-      <div className="flex justify-center pt-3 pb-1 flex-shrink-0">
-        <div className="w-10 h-1 rounded-full bg-[#E5E7EB]" />
-      </div>
-
-      {/* Header */}
-      <div className="flex items-center gap-2 px-4 pb-3 border-b border-[#E5E7EB] flex-shrink-0">
-        <button
-          type="button"
-          onClick={onClose}
+      <div className="flex items-center gap-2 px-4 py-3 border-b border-[#E5E7EB] flex-shrink-0">
+        <button type="button" onClick={onClose}
           className="flex items-center justify-center min-w-[48px] min-h-[48px] text-[#6B7280]"
-          aria-label="Kembali"
-        >
+          aria-label="Kembali">
           <ChevronLeft size={20} />
         </button>
-        <span className="text-sm font-semibold text-[#1A1A2E]">
-          Pilih Pengguna — {deptName}
-        </span>
+        <span className="text-sm font-semibold text-[#1A1A2E]">Pilih Pengguna — {deptName}</span>
       </div>
-
-      {/* User list */}
-      <div className="overflow-y-auto flex-1">
+      <div className="overflow-y-auto flex-1 overscroll-contain">
         {users.length === 0 ? (
-          <p className="text-sm text-[#6B7280] text-center py-8">
-            Tidak ada pengguna di departemen ini.
-          </p>
-        ) : (
-          users.map((user, idx) => {
-            const isLast = idx === users.length - 1;
-            return (
-              <button
-                key={user.id}
-                type="button"
-                onClick={() => handleUserTap(user)}
-                className={[
-                  'w-full flex items-center gap-3 px-4 py-3 min-h-[56px]',
-                  'hover:bg-[#F8F9FA] text-left transition-colors duration-100',
-                  !isLast ? 'border-b border-[#E5E7EB]' : '',
-                ].join(' ')}
-              >
-                <div className="w-8 h-8 rounded-full bg-[#2A7B76] flex items-center justify-center flex-shrink-0">
-                  <span className="text-white text-xs font-semibold select-none">
-                    {getInitials(user.name)}
-                  </span>
-                </div>
-                <div className="flex flex-col items-start">
-                  <span className="text-base font-semibold text-[#1A1A2E] leading-tight">{user.name}</span>
-                  <span className="text-[13px] text-[#6B7280] capitalize">{user.role}</span>
-                </div>
-              </button>
-            );
-          })
-        )}
+          <p className="text-sm text-[#6B7280] text-center py-8">Tidak ada pengguna di departemen ini.</p>
+        ) : users.map((user, idx) => (
+          <button key={user.id} type="button" onClick={() => handleUserTap(user)}
+            className={[
+              'w-full flex items-center gap-3 px-4 py-3 min-h-[56px]',
+              'hover:bg-[#F8F9FA] text-left transition-colors duration-100',
+              idx < users.length - 1 ? 'border-b border-[#E5E7EB]' : '',
+            ].join(' ')}>
+            <div className="w-8 h-8 rounded-full bg-[#2A7B76] flex items-center justify-center flex-shrink-0">
+              <span className="text-white text-xs font-semibold select-none">{getInitials(user.name)}</span>
+            </div>
+            <div className="flex flex-col items-start">
+              <span className="text-base font-semibold text-[#1A1A2E] leading-tight">{user.name}</span>
+              <span className="text-[13px] text-[#6B7280] capitalize">{user.role}</span>
+            </div>
+          </button>
+        ))}
       </div>
     </>
   );
 }
 
 // ─── Main Page ──────────────────────────────────────────────────────────────
-
 export default function SelectDeptPage() {
-  // ── Local state: keeps page self-contained, syncs to Zustand for /login guard ──
-  const [selectedDept,  setSelectedDept]  = useState<string | null>(null);
-  const [drawerOpen,    setDrawerOpen]    = useState(false);
-  const [triggerRect,   setTriggerRect]   = useState<DOMRect | null>(null);
+  // Single state atom for drawer — one setState call to open/close
+  const [drawer, setDrawer] = useState<{ open: boolean; dept: string | null }>({
+    open: false,
+    dept: null,
+  });
   const [forgotPinOpen, setForgotPinOpen] = useState(false);
 
-  function handleCardTap(name: string, rect: DOMRect) {
-    setSelectedDept(name);
-    setTriggerRect(rect);
-    setDrawerOpen(true);
-    // Mirror into Zustand so /login can read it
-    useUIStore.getState().setSelectedDept(name);
-    useUIStore.getState().setDrawerOpen(true);
-  }
+  const closeDrawer = () => setDrawer({ open: false, dept: null });
 
-  function handleCloseDrawer() {
-    setDrawerOpen(false);
-    setSelectedDept(null);
-    setTriggerRect(null);
-    useUIStore.getState().setDrawerOpen(false);
-    useUIStore.getState().setSelectedDept(null);
+  // Force-close on navigation (back button, popstate, page hide)
+  useEffect(() => {
+    const handleHide = () => setDrawer({ open: false, dept: null });
+    window.addEventListener('pagehide',    handleHide);
+    window.addEventListener('popstate',    handleHide);
+    window.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') handleHide();
+    });
+    return () => {
+      window.removeEventListener('pagehide',    handleHide);
+      window.removeEventListener('popstate',    handleHide);
+    };
+  }, []);
+
+  function handleCardTap(name: string, _rect: DOMRect) {
+    // Close any open state first, then open fresh
+    setDrawer({ open: false, dept: null });
+    requestAnimationFrame(() => setDrawer({ open: true, dept: name }));
   }
 
   return (
-    <div className="min-h-screen bg-[#F8F9FA] px-4 py-8 relative">
+    <div className="min-h-screen bg-[#F8F9FA] px-4 py-8">
 
       {/* Logo */}
       <div className="flex flex-col items-center mb-6">
         <div className="w-20 h-20 rounded-full bg-[#2A7B76] flex items-center justify-center">
           <span className="text-white text-2xl font-bold select-none">PG</span>
         </div>
-        <h1 className="text-2xl font-bold text-[#1A1A2E] text-center mt-4">
-          Pilih Departemen
-        </h1>
+        <h1 className="text-2xl font-bold text-[#1A1A2E] text-center mt-4">Pilih Departemen</h1>
       </div>
 
-      {/* Department card grid — source of interaction */}
-      <DepartmentGrid selectedDept={selectedDept} onCardTap={handleCardTap} />
+      <DepartmentGrid selectedDept={drawer.dept} onCardTap={handleCardTap} />
 
-      {/* Lupa PIN link */}
       <div className="mt-8 flex justify-center">
-        <button
-          type="button"
-          onClick={() => setForgotPinOpen(true)}
-          className="text-[13px] text-[#2A7B76] underline min-h-[48px] px-2"
-        >
+        <button type="button" onClick={() => setForgotPinOpen(true)}
+          className="text-[13px] text-[#2A7B76] underline min-h-[48px] px-2">
           Lupa PIN? Hubungi Admin
         </button>
       </div>
 
-      {/* Origin-anchored user drawer */}
-      <OriginDrawer
-        open={drawerOpen}
-        triggerRect={triggerRect}
-        onClose={handleCloseDrawer}
-        maxHeight="70vh"
-      >
-        {selectedDept && (
-          <UserDrawerContent deptName={selectedDept} onClose={handleCloseDrawer} />
+      {/* Drawer — only rendered when open=true; unmounts itself via transitionend */}
+      <OriginDrawer open={drawer.open} onClose={closeDrawer} maxHeight="88vh">
+        {drawer.dept && (
+          <UserDrawerContent deptName={drawer.dept} onClose={closeDrawer} />
         )}
       </OriginDrawer>
 
-      {/* Forgot PIN sheet (standard bottom sheet, no origin needed) */}
-      {forgotPinOpen && (
-        <ForgotPinSheet onClose={() => setForgotPinOpen(false)} />
-      )}
+      {forgotPinOpen && <ForgotPinSheet onClose={() => setForgotPinOpen(false)} />}
     </div>
   );
 }
