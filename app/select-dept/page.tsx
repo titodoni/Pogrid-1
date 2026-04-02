@@ -29,17 +29,7 @@ const DEPT_CARDS: { name: string; icon: LucideIcon }[] = [
   { name: 'Sales',      icon: Briefcase },
 ];
 
-// ─── close helper — single source of truth ─────────────────────────────────────────
-// exported so it can also be called from navigation
-function makeCloseDrawer(
-  set: (fn: (prev: { open: boolean; dept: string | null }) =>
-    { open: boolean; dept: string | null }) => void
-) {
-  return () =>
-    set(() => ({ open: false, dept: null }));
-}
-
-// ─── ForgotPinSheet ───────────────────────────────────────────────────────────
+// ─── ForgotPinSheet ───────────────────────────────────────────────────────
 function ForgotPinSheet({ onClose }: { onClose: () => void }) {
   return (
     <>
@@ -80,7 +70,7 @@ function ForgotPinSheet({ onClose }: { onClose: () => void }) {
   );
 }
 
-// ─── DepartmentGrid ───────────────────────────────────────────────────────────
+// ─── DepartmentGrid ───────────────────────────────────────────────────────
 function DepartmentGrid({
   selectedDept,
   onCardTap,
@@ -119,18 +109,16 @@ function DepartmentGrid({
   );
 }
 
-// ─── UserDrawerContent ──────────────────────────────────────────────────────────
+// ─── UserDrawerContent ───────────────────────────────────────────────────────
 function UserDrawerContent({ deptName, onClose }: { deptName: string; onClose: () => void }) {
   const users = mockUsers.filter((u) => u.department === deptName);
 
   function handleUserTap(user: (typeof mockUsers)[number]) {
-    // Close drawer + clear state before navigation
     onClose();
     useUIStore.getState().setSession({
       userId: user.id, name: user.name,
       department: user.department, role: user.role, isLoggedIn: true,
     });
-    // Small delay so close animation starts before page unloads
     setTimeout(() => { window.location.href = '/login'; }, 80);
   }
 
@@ -168,35 +156,43 @@ function UserDrawerContent({ deptName, onClose }: { deptName: string; onClose: (
   );
 }
 
-// ─── Main Page ──────────────────────────────────────────────────────────────
+// ─── Main Page ─────────────────────────────────────────────────────────────
 export default function SelectDeptPage() {
-  // Single state atom for drawer — one setState call to open/close
-  const [drawer, setDrawer] = useState<{ open: boolean; dept: string | null }>({
-    open: false,
-    dept: null,
-  });
+  const [drawer, setDrawer] = useState<{
+    open: boolean;
+    dept: string | null;
+    rect: DOMRect | null;
+  }>({ open: false, dept: null, rect: null });
+
   const [forgotPinOpen, setForgotPinOpen] = useState(false);
 
-  const closeDrawer = () => setDrawer({ open: false, dept: null });
+  const closeDrawer = () => setDrawer({ open: false, dept: null, rect: null });
 
-  // Force-close on navigation (back button, popstate, page hide)
+  // Force-close on navigation / visibility change
   useEffect(() => {
-    const handleHide = () => setDrawer({ open: false, dept: null });
+    const handleHide = () => setDrawer({ open: false, dept: null, rect: null });
     window.addEventListener('pagehide',    handleHide);
     window.addEventListener('popstate',    handleHide);
-    window.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'hidden') handleHide();
-    });
+    const onVis = () => { if (document.visibilityState === 'hidden') handleHide(); };
+    document.addEventListener('visibilitychange', onVis);
     return () => {
-      window.removeEventListener('pagehide',    handleHide);
-      window.removeEventListener('popstate',    handleHide);
+      window.removeEventListener('pagehide', handleHide);
+      window.removeEventListener('popstate', handleHide);
+      document.removeEventListener('visibilitychange', onVis);
     };
   }, []);
 
-  function handleCardTap(name: string, _rect: DOMRect) {
-    // Close any open state first, then open fresh
-    setDrawer({ open: false, dept: null });
-    requestAnimationFrame(() => setDrawer({ open: true, dept: name }));
+  function handleCardTap(name: string, rect: DOMRect) {
+    // If same card tapped while open, close it
+    if (drawer.open && drawer.dept === name) {
+      closeDrawer();
+      return;
+    }
+    // Reset then open with fresh rect
+    setDrawer({ open: false, dept: null, rect: null });
+    requestAnimationFrame(() =>
+      setDrawer({ open: true, dept: name, rect })
+    );
   }
 
   return (
@@ -219,8 +215,13 @@ export default function SelectDeptPage() {
         </button>
       </div>
 
-      {/* Drawer — only rendered when open=true; unmounts itself via transitionend */}
-      <OriginDrawer open={drawer.open} onClose={closeDrawer} maxHeight="88vh">
+      {/* Sheet grows from tapped card */}
+      <OriginDrawer
+        open={drawer.open}
+        triggerRect={drawer.rect}
+        onClose={closeDrawer}
+        maxHeight="88vh"
+      >
         {drawer.dept && (
           <UserDrawerContent deptName={drawer.dept} onClose={closeDrawer} />
         )}
