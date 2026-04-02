@@ -1,15 +1,23 @@
 'use client';
 
 /**
- * OriginDrawer — card-origin bottom sheet.
+ * OriginDrawer — Contextual Expansion (NOT a bottom sheet).
  *
- * Phase flow:
- *   measure  → render OFF-SCREEN (top: vh+100) at full width, height:auto
- *              read scrollHeight → store as panelH
- *   origin   → SNAP (no transition) to card rect
- *   expanded → ANIMATE (spring) from card rect → bottom of screen
- *   closing  → ANIMATE (ease-in) back to card rect
- *   out      → unmount
+ * The panel is anchored to the tapped card and expands DOWNWARD.
+ * It never moves to the bottom of the screen.
+ *
+ * Positioning:
+ *   top   = triggerRect.top          (card's Y — fixed anchor)
+ *   left  = triggerRect.left
+ *   width = triggerRect.width
+ *
+ * Animation:
+ *   closed : height = triggerRect.height  (looks like the card)
+ *   open   : height = measured content height (clamped to maxHeight)
+ *
+ * NO viewport-height math.
+ * NO translateY across the screen.
+ * NO bottom anchoring.
  */
 
 import React, {
@@ -21,19 +29,19 @@ export interface OriginDrawerProps {
   triggerRect: DOMRect | null;
   onClose: () => void;
   children: React.ReactNode;
-  maxHeight?: string;
+  maxHeight?: string;  // default '65vh'
   className?: string;
 }
 
-const CLOSE_DRAG_PX = 80;
+const CLOSE_DRAG_PX = 60;
 const CLOSE_VEL     = 0.4;
 
-type Phase = 'out' | 'measure' | 'origin' | 'expanded' | 'closing';
+type Phase = 'out' | 'measure' | 'closed' | 'open' | 'closing';
 
-function maxHeightToPx(maxHeight: string, vh: number): number {
-  if (maxHeight.endsWith('vh'))  return (parseFloat(maxHeight) / 100) * vh;
-  if (maxHeight.endsWith('px'))  return parseFloat(maxHeight);
-  return vh * 0.88;
+function toPx(value: string, vh: number): number {
+  if (value.endsWith('vh'))  return (parseFloat(value) / 100) * vh;
+  if (value.endsWith('px'))  return parseFloat(value);
+  return vh * 0.65;
 }
 
 export function OriginDrawer({
@@ -41,54 +49,53 @@ export function OriginDrawer({
   triggerRect,
   onClose,
   children,
-  maxHeight = '88vh',
+  maxHeight = '65vh',
   className = '',
 }: OriginDrawerProps) {
   const [phase,    setPhase]    = useState<Phase>('out');
-  const [panelH,   setPanelH]   = useState(0);
+  const [contentH, setContentH] = useState(0);  // measured px height of content
   const [dragY,    setDragY]    = useState(0);
   const [dragging, setDragging] = useState(false);
 
-  const sheetRef = useRef<HTMLDivElement>(null);
+  const innerRef = useRef<HTMLDivElement>(null);  // measures content
   const startY   = useRef(0);
   const startT   = useRef(0);
   const lastY    = useRef(0);
   const didClose = useRef(false);
 
-  // ── open/close triggers ──
+  // ── Open / close lifecycle ──
   useEffect(() => {
     if (open && triggerRect) {
       didClose.current = false;
       setDragY(0);
-      setPanelH(0);
+      setContentH(0);
       setPhase('measure');
     } else if (!open) {
       setPhase('closing');
     }
   }, [open, triggerRect]);
 
-  // ── measure: read true content height ──
+  // ── Measure true content height (rendered off-screen) ──
   useLayoutEffect(() => {
     if (phase !== 'measure') return;
-    if (!sheetRef.current || !triggerRect) return;
+    if (!innerRef.current) return;
 
     const vh    = window.innerHeight;
-    const maxPx = maxHeightToPx(maxHeight, vh);
-    // scrollHeight = true content height (sheet has height:auto, no overflow clip)
-    const h = Math.min(sheetRef.current.scrollHeight, maxPx);
-    setPanelH(h);
+    const maxPx = toPx(maxHeight, vh);
+    const h     = Math.min(innerRef.current.scrollHeight, maxPx);
+    setContentH(h);
 
-    // Snap to card — no transition
-    setPhase('origin');
-    // Two frames later: animate to expanded
+    // Snap to card size (closed look) with no transition
+    setPhase('closed');
+    // Then animate open
     requestAnimationFrame(() =>
-      requestAnimationFrame(() => setPhase('expanded'))
+      requestAnimationFrame(() => setPhase('open'))
     );
-  }, [phase, triggerRect, maxHeight]);
+  }, [phase, maxHeight]);
 
-  // ── unmount after close animation ──
+  // ── Unmount after close animation ──
   const handleTransitionEnd = useCallback((e: React.TransitionEvent) => {
-    if (e.propertyName !== 'top') return;
+    if (e.propertyName !== 'height') return;
     if (phase === 'closing' && !didClose.current) {
       didClose.current = true;
       setPhase('out');
@@ -96,7 +103,7 @@ export function OriginDrawer({
     }
   }, [phase]);
 
-  // ── swipe to close ──
+  // ── Swipe down to close ──
   const onTouchStart = useCallback((e: React.TouchEvent) => {
     startY.current = e.touches[0].clientY;
     lastY.current  = e.touches[0].clientY;
@@ -118,101 +125,82 @@ export function OriginDrawer({
     else setDragY(0);
   }, [onClose]);
 
-  // ── bail if not mounted ──
   if (phase === 'out' || !triggerRect) return null;
 
   const vh    = window.innerHeight;
-  const vw    = window.innerWidth;
-  const maxPx = maxHeightToPx(maxHeight, vh);
+  const maxPx = toPx(maxHeight, vh);
 
-  // Use measured height or fall back to maxPx until measurement is done
-  const expandedH   = panelH > 0 ? panelH : maxPx;
-  const expandedTop = vh - expandedH;
+  // ── Anchor: always at card position ──
+  const panelTop   = triggerRect.top;
+  const panelLeft  = triggerRect.left;
+  const panelWidth = triggerRect.width;
 
-  // ── per-phase geometry (ALL pixels, no `auto` in animated props) ──
-  let top:      number;
-  let left:     number;
-  let width:    number;
+  // ── Height: card height when closed, content height when open ──
+  const closedH = triggerRect.height;
+  const openH   = contentH > 0 ? contentH : maxPx;
+
   let height:   number | string;
   let overflow: string;
 
   switch (phase) {
     case 'measure':
-      // Completely off-screen below viewport so user never sees it
-      top      = vh + 100;
-      left     = 0;
-      width    = vw;
-      height   = 'auto';    // must be auto so scrollHeight = content height
-      overflow = 'visible'; // no clip during measure
+      height   = 'auto';
+      overflow = 'visible';
       break;
-
-    case 'origin':
+    case 'closed':
     case 'closing':
-      // At the tapped card
-      top      = triggerRect.top;
-      left     = triggerRect.left;
-      width    = triggerRect.width;
-      height   = triggerRect.height;
+      height   = closedH;
       overflow = 'hidden';
       break;
-
-    default: // 'expanded'
-      top      = expandedTop;
-      left     = 0;
-      width    = vw;
-      height   = expandedH;
+    default: // 'open'
+      height   = openH + dragY;
       overflow = 'hidden';
   }
 
-  const borderRadius =
-    phase === 'expanded' ? '20px 20px 0 0' :
-    phase === 'measure'  ? '20px 20px 0 0' :
-    '12px';
+  const isOpen = phase === 'open';
 
-  const transform = (phase === 'expanded' && dragY > 0)
-    ? `translateY(${dragY}px)`
-    : 'translateY(0px)';
-
-  // No transition during measure (off-screen) or origin (instant snap)
-  // Spring on expand, fast ease-in on close
+  // Height-only animation — no position change
   const transition =
-    (phase === 'measure' || phase === 'origin' || dragging)
+    (phase === 'measure' || phase === 'closed' || dragging)
       ? 'none'
-      : phase === 'expanded'
-        ? 'top 360ms cubic-bezier(0.34,1.28,0.64,1), left 360ms cubic-bezier(0.34,1.28,0.64,1), width 360ms cubic-bezier(0.34,1.28,0.64,1), height 360ms cubic-bezier(0.34,1.28,0.64,1), border-radius 360ms ease, transform 240ms ease-out'
-        : 'top 260ms ease-in, left 260ms ease-in, width 260ms ease-in, height 260ms ease-in, border-radius 260ms ease';
+      : isOpen
+        ? 'height 320ms cubic-bezier(0.34,1.2,0.64,1), border-radius 320ms ease'
+        : 'height 220ms ease-in, border-radius 220ms ease';
 
-  const opacity          = phase === 'measure' ? 0 : 1;
-  const backdropOpacity  = phase === 'expanded'
-    ? Math.max(0, 1 - dragY / 200)
-    : phase === 'closing' ? 0
-    : 0;
+  const borderRadius = isOpen ? '12px' : '12px';
+  const opacity      = phase === 'measure' ? 0 : 1;
+  const backdropOpacity = isOpen ? Math.max(0, 1 - dragY / 160) : 0;
 
   return (
     <>
-      {/* Backdrop */}
+      {/* Dim backdrop — tap to close */}
       <div
         className="fixed inset-0 z-40"
         style={{
-          backgroundColor: 'rgba(0,0,0,0.45)',
+          backgroundColor: 'rgba(0,0,0,0.35)',
           opacity: backdropOpacity,
-          transition: dragging ? 'none' : 'opacity 300ms ease',
-          pointerEvents: phase === 'expanded' && dragY < 10 ? 'auto' : 'none',
+          transition: dragging ? 'none' : 'opacity 280ms ease',
+          pointerEvents: isOpen && dragY < 10 ? 'auto' : 'none',
         }}
         onClick={onClose}
         aria-hidden="true"
       />
 
-      {/* Sheet */}
+      {/* Panel — anchored to card, expands downward */}
       <div
-        ref={sheetRef}
         role="dialog"
         aria-modal="true"
-        className={['fixed z-50 bg-white shadow-xl flex flex-col', className].join(' ')}
+        className={['fixed z-50 bg-white shadow-2xl', className].join(' ')}
         style={{
-          top, left, width, height, overflow,
-          borderRadius, opacity, transform, transition,
-          willChange: 'top, left, width, height, transform',
+          top:    panelTop,
+          left:   panelLeft,
+          width:  panelWidth,
+          height,
+          overflow,
+          borderRadius,
+          opacity,
+          transition,
+          willChange: 'height',
           touchAction: 'none',
         }}
         onTouchStart={onTouchStart}
@@ -220,22 +208,10 @@ export function OriginDrawer({
         onTouchEnd={onTouchEnd}
         onTransitionEnd={handleTransitionEnd}
       >
-        {/* Drag handle — only when expanded */}
-        {phase === 'expanded' && (
-          <div className="flex justify-center pt-3 pb-1 flex-shrink-0" aria-hidden="true">
-            <div className="w-10 h-[5px] rounded-full bg-[#E5E7EB]" />
-          </div>
-        )}
-
-        {/* Scrollable content */}
-        <div className="flex flex-col flex-1 min-h-0 overflow-y-auto overscroll-contain">
+        {/* Inner div — measured for content height */}
+        <div ref={innerRef} className="flex flex-col">
           {children}
         </div>
-
-        {/* iOS safe area */}
-        {phase === 'expanded' && (
-          <div className="flex-shrink-0" style={{ height: 'env(safe-area-inset-bottom, 0px)' }} />
-        )}
       </div>
     </>
   );
