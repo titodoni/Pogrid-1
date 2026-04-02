@@ -16,15 +16,13 @@ export interface UIStore {
   clearSession(): void;
 
   // ── 2. BatalkanControl (per-item, keyed by itemId) ──────────────────────
-  // Ref: UIUX.md §9.5 BatalkanControl 3-State Machine
-  // Pusher fires ONLY after the 5s Batalkan window closes (UIUX.md Hard Rule #10)
   pendingProgress: Record<
     string,
     {
       previous: number;
       timeoutRef: ReturnType<typeof setTimeout> | null;
-      failedUndo: boolean;  // Amendment #8 — network failure tracking
-      retryCount: number;   // Amendment #8 — retry attempts (max 5)
+      failedUndo: boolean;
+      retryCount: number;
     }
   >;
   setPendingProgress(
@@ -36,8 +34,7 @@ export interface UIStore {
   setUndoFailed(itemId: string, failed: boolean): void;
   incrementRetryCount(itemId: string): void;
 
-  // ── 3. Bottom Sheets ─────────────────────────────────────────────────
-  // Ref: UIUX.md §9.6 QCGateSheet | §9.7 DeliveryGateSheet | §9.8 ProfileDrawer
+  // ── 3. Bottom Sheets ────────────────────────────────────────────────
   activeBottomSheet:
     | 'qc-gate'
     | 'delivery-gate'
@@ -47,39 +44,39 @@ export interface UIStore {
     | 'profile'
     | null;
   bottomSheetItemId: string | null;
-  openBottomSheet(
-    sheet: UIStore['activeBottomSheet'],
-    itemId: string,
-  ): void;
+  openBottomSheet(sheet: UIStore['activeBottomSheet'], itemId: string): void;
   closeBottomSheet(): void;
 
-  // ── 4. Connection Status ────────────────────────────────────────────
-  // Ref: UIUX.md Offline Awareness (Manifesto §11)
+  // ── 4. Connection Status ───────────────────────────────────────────
   connectionStatus: 'online' | 'offline' | 'reconnecting';
   setConnectionStatus(status: UIStore['connectionStatus']): void;
 
-  // ── 5. Board Filters ────────────────────────────────────────────────
-  // Ref: UIUX.md §9.9 FilterChips (Board) — no active filters by default
+  // ── 5. Board Filters ───────────────────────────────────────────────
   boardFilters: string[];
   setBoardFilters(filters: string[]): void;
   toggleBoardFilter(filter: string): void;
 
-  // ── 6. My Jobs Display ──────────────────────────────────────────────
-  // Ref: UIUX.md Screen 3 (/jobs) — Aktif/Arsip segments + Hari Ini filter
-  showCompleted: boolean;      // controls Lihat Selesai / Arsip chip
+  // ── 6. My Jobs Display ─────────────────────────────────────────────
+  showCompleted: boolean;
   toggleShowCompleted(): void;
-  hariIniActive: boolean;      // Hari Ini chip — active by default for workers
+  hariIniActive: boolean;
   toggleHariIni(): void;
 
-  // ── 7. Local Item Progress (optimistic UI) ─────────────────────────
-  // Ref: UIUX.md §9.4 ProgressSlider / StepperControl — optimistic slider state
+  // ── 7. Local Item Progress ───────────────────────────────────────────
   localProgress: Record<string, number>;
   setLocalProgress(itemId: string, value: number): void;
   clearLocalProgress(itemId: string): void;
+
+  // ── 8. Select-Dept Screen State (Amendment #13) ───────────────────────
+  selectedDept: string | null;
+  drawerOpen: boolean;
+  forgotPinOpen: boolean;
+  setSelectedDept(dept: string | null): void;
+  setDrawerOpen(open: boolean): void;
+  setForgotPinOpen(open: boolean): void;
 }
 
 // ─── Store ─────────────────────────────────────────────────────────────────────
-// Zustand v5 double-invocation pattern with immer middleware
 
 const useUIStore = create<UIStore>()(immer((set) => ({
 
@@ -87,15 +84,10 @@ const useUIStore = create<UIStore>()(immer((set) => ({
   session: null,
 
   setSession(session) {
-    set((draft) => {
-      draft.session = session;
-    });
+    set((draft) => { draft.session = session; });
   },
-
   clearSession() {
-    set((draft) => {
-      draft.session = null;
-    });
+    set((draft) => { draft.session = null; });
   },
 
   // ── 2. BatalkanControl ─────────────────────────────────────────────────
@@ -103,34 +95,20 @@ const useUIStore = create<UIStore>()(immer((set) => ({
 
   setPendingProgress(itemId, previous, timeoutRef) {
     set((draft) => {
-      draft.pendingProgress[itemId] = {
-        previous,
-        timeoutRef,
-        failedUndo: false,
-        retryCount: 0,
-      };
+      draft.pendingProgress[itemId] = { previous, timeoutRef, failedUndo: false, retryCount: 0 };
     });
   },
-
   clearPendingProgress(itemId) {
-    set((draft) => {
-      delete draft.pendingProgress[itemId];
-    });
+    set((draft) => { delete draft.pendingProgress[itemId]; });
   },
-
   setUndoFailed(itemId, failed) {
     set((draft) => {
-      if (draft.pendingProgress[itemId]) {
-        draft.pendingProgress[itemId].failedUndo = failed;
-      }
+      if (draft.pendingProgress[itemId]) draft.pendingProgress[itemId].failedUndo = failed;
     });
   },
-
   incrementRetryCount(itemId) {
     set((draft) => {
-      if (draft.pendingProgress[itemId]) {
-        draft.pendingProgress[itemId].retryCount += 1;
-      }
+      if (draft.pendingProgress[itemId]) draft.pendingProgress[itemId].retryCount += 1;
     });
   },
 
@@ -139,78 +117,66 @@ const useUIStore = create<UIStore>()(immer((set) => ({
   bottomSheetItemId: null,
 
   openBottomSheet(sheet, itemId) {
-    set((draft) => {
-      draft.activeBottomSheet = sheet;
-      draft.bottomSheetItemId = itemId;
-    });
+    set((draft) => { draft.activeBottomSheet = sheet; draft.bottomSheetItemId = itemId; });
   },
-
   closeBottomSheet() {
-    set((draft) => {
-      draft.activeBottomSheet = null;
-      draft.bottomSheetItemId = null;
-    });
+    set((draft) => { draft.activeBottomSheet = null; draft.bottomSheetItemId = null; });
   },
 
   // ── 4. Connection Status ───────────────────────────────────────────
   connectionStatus: 'online',
 
   setConnectionStatus(status) {
-    set((draft) => {
-      draft.connectionStatus = status;
-    });
+    set((draft) => { draft.connectionStatus = status; });
   },
 
   // ── 5. Board Filters ───────────────────────────────────────────────
   boardFilters: [],
 
   setBoardFilters(filters) {
-    set((draft) => {
-      draft.boardFilters = filters;
-    });
+    set((draft) => { draft.boardFilters = filters; });
   },
-
   toggleBoardFilter(filter) {
     set((draft) => {
       const idx = draft.boardFilters.indexOf(filter);
-      if (idx === -1) {
-        draft.boardFilters.push(filter);
-      } else {
-        draft.boardFilters.splice(idx, 1);
-      }
+      if (idx === -1) draft.boardFilters.push(filter);
+      else draft.boardFilters.splice(idx, 1);
     });
   },
 
   // ── 6. My Jobs Display ─────────────────────────────────────────────
   showCompleted: false,
-
   toggleShowCompleted() {
-    set((draft) => {
-      draft.showCompleted = !draft.showCompleted;
-    });
+    set((draft) => { draft.showCompleted = !draft.showCompleted; });
   },
-
   hariIniActive: true,
-
   toggleHariIni() {
-    set((draft) => {
-      draft.hariIniActive = !draft.hariIniActive;
-    });
+    set((draft) => { draft.hariIniActive = !draft.hariIniActive; });
   },
 
   // ── 7. Local Item Progress ───────────────────────────────────────────
   localProgress: {},
 
   setLocalProgress(itemId, value) {
-    set((draft) => {
-      draft.localProgress[itemId] = value;
-    });
+    set((draft) => { draft.localProgress[itemId] = value; });
+  },
+  clearLocalProgress(itemId) {
+    set((draft) => { delete draft.localProgress[itemId]; });
   },
 
-  clearLocalProgress(itemId) {
-    set((draft) => {
-      delete draft.localProgress[itemId];
-    });
+  // ── 8. Select-Dept Screen State (Amendment #13) ───────────────────────
+  selectedDept: null,
+  drawerOpen: false,
+  forgotPinOpen: false,
+
+  setSelectedDept(dept) {
+    set((draft) => { draft.selectedDept = dept; });
+  },
+  setDrawerOpen(open) {
+    set((draft) => { draft.drawerOpen = open; });
+  },
+  setForgotPinOpen(open) {
+    set((draft) => { draft.forgotPinOpen = open; });
   },
 
 })));
