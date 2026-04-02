@@ -109,8 +109,13 @@ function DepartmentGrid({
   );
 }
 
-// ─── UserDrawerContent ───────────────────────────────────────────────────────
-function UserDrawerContent({ deptName, onClose }: { deptName: string; onClose: () => void }) {
+// ─── UserPanelContent ────────────────────────────────────────────────────
+// Card header + user list — the card IS the header
+function UserPanelContent({ deptName, icon: Icon, onClose }: {
+  deptName: string;
+  icon: LucideIcon;
+  onClose: () => void;
+}) {
   const users = mockUsers.filter((u) => u.department === deptName);
 
   function handleUserTap(user: (typeof mockUsers)[number]) {
@@ -123,36 +128,49 @@ function UserDrawerContent({ deptName, onClose }: { deptName: string; onClose: (
   }
 
   return (
-    <>
-      <div className="flex items-center gap-2 px-4 py-3 border-b border-[#E5E7EB] flex-shrink-0">
-        <button type="button" onClick={onClose}
-          className="flex items-center justify-center min-w-[48px] min-h-[48px] text-[#6B7280]"
-          aria-label="Kembali">
-          <ChevronLeft size={20} />
-        </button>
-        <span className="text-sm font-semibold text-[#1A1A2E]">Pilih Pengguna — {deptName}</span>
+    <div className="flex flex-col">
+      {/* Card header — looks like the original card */}
+      <div className="flex flex-col items-center justify-center gap-2 p-3 border-b border-[#E5E7EB] bg-white">
+        <Icon size={28} className="text-[#2A7B76]" />
+        <div className="flex items-center gap-1">
+          <span className="text-[13px] font-semibold text-[#1A1A2E]">{deptName}</span>
+          <button
+            type="button"
+            onClick={onClose}
+            className="ml-1 text-[#9CA3AF] hover:text-[#6B7280] flex items-center"
+            aria-label="Tutup"
+          >
+            <X size={14} />
+          </button>
+        </div>
       </div>
-      <div className="overflow-y-auto flex-1 overscroll-contain">
+
+      {/* User list */}
+      <div className="overflow-y-auto">
         {users.length === 0 ? (
-          <p className="text-sm text-[#6B7280] text-center py-8">Tidak ada pengguna di departemen ini.</p>
+          <p className="text-xs text-[#6B7280] text-center py-4">Tidak ada pengguna.</p>
         ) : users.map((user, idx) => (
-          <button key={user.id} type="button" onClick={() => handleUserTap(user)}
+          <button
+            key={user.id}
+            type="button"
+            onClick={() => handleUserTap(user)}
             className={[
-              'w-full flex items-center gap-3 px-4 py-3 min-h-[56px]',
-              'hover:bg-[#F8F9FA] text-left transition-colors duration-100',
-              idx < users.length - 1 ? 'border-b border-[#E5E7EB]' : '',
-            ].join(' ')}>
-            <div className="w-8 h-8 rounded-full bg-[#2A7B76] flex items-center justify-center flex-shrink-0">
-              <span className="text-white text-xs font-semibold select-none">{getInitials(user.name)}</span>
+              'w-full flex items-center gap-2 px-3 py-2.5 min-h-[48px]',
+              'hover:bg-[#F0FAF9] text-left transition-colors duration-100',
+              idx < users.length - 1 ? 'border-b border-[#F3F4F6]' : '',
+            ].join(' ')}
+          >
+            <div className="w-7 h-7 rounded-full bg-[#2A7B76] flex items-center justify-center flex-shrink-0">
+              <span className="text-white text-[10px] font-bold select-none">{getInitials(user.name)}</span>
             </div>
             <div className="flex flex-col items-start">
-              <span className="text-base font-semibold text-[#1A1A2E] leading-tight">{user.name}</span>
-              <span className="text-[13px] text-[#6B7280] capitalize">{user.role}</span>
+              <span className="text-sm font-semibold text-[#1A1A2E] leading-tight">{user.name}</span>
+              <span className="text-[11px] text-[#6B7280] capitalize">{user.role}</span>
             </div>
           </button>
         ))}
       </div>
-    </>
+    </div>
   );
 }
 
@@ -161,44 +179,36 @@ export default function SelectDeptPage() {
   const [drawer, setDrawer] = useState<{
     open: boolean;
     dept: string | null;
+    icon: LucideIcon | null;
     rect: DOMRect | null;
-  }>({ open: false, dept: null, rect: null });
+  }>({ open: false, dept: null, icon: null, rect: null });
 
   const [forgotPinOpen, setForgotPinOpen] = useState(false);
 
-  const closeDrawer = () => setDrawer({ open: false, dept: null, rect: null });
+  const closeDrawer = () => setDrawer({ open: false, dept: null, icon: null, rect: null });
 
-  // Force-close on navigation / visibility change
   useEffect(() => {
-    const handleHide = () => setDrawer({ open: false, dept: null, rect: null });
-    window.addEventListener('pagehide',    handleHide);
-    window.addEventListener('popstate',    handleHide);
-    const onVis = () => { if (document.visibilityState === 'hidden') handleHide(); };
+    const hide = () => setDrawer({ open: false, dept: null, icon: null, rect: null });
+    window.addEventListener('pagehide', hide);
+    window.addEventListener('popstate', hide);
+    const onVis = () => { if (document.visibilityState === 'hidden') hide(); };
     document.addEventListener('visibilitychange', onVis);
     return () => {
-      window.removeEventListener('pagehide', handleHide);
-      window.removeEventListener('popstate', handleHide);
+      window.removeEventListener('pagehide', hide);
+      window.removeEventListener('popstate', hide);
       document.removeEventListener('visibilitychange', onVis);
     };
   }, []);
 
-  function handleCardTap(name: string, rect: DOMRect) {
-    // If same card tapped while open, close it
-    if (drawer.open && drawer.dept === name) {
-      closeDrawer();
-      return;
-    }
-    // Reset then open with fresh rect
-    setDrawer({ open: false, dept: null, rect: null });
-    requestAnimationFrame(() =>
-      setDrawer({ open: true, dept: name, rect })
-    );
+  function handleCardTap(name: string, icon: LucideIcon, rect: DOMRect) {
+    if (drawer.open && drawer.dept === name) { closeDrawer(); return; }
+    setDrawer({ open: false, dept: null, icon: null, rect: null });
+    requestAnimationFrame(() => setDrawer({ open: true, dept: name, icon, rect }));
   }
 
   return (
     <div className="min-h-screen bg-[#F8F9FA] px-4 py-8">
 
-      {/* Logo */}
       <div className="flex flex-col items-center mb-6">
         <div className="w-20 h-20 rounded-full bg-[#2A7B76] flex items-center justify-center">
           <span className="text-white text-2xl font-bold select-none">PG</span>
@@ -206,7 +216,31 @@ export default function SelectDeptPage() {
         <h1 className="text-2xl font-bold text-[#1A1A2E] text-center mt-4">Pilih Departemen</h1>
       </div>
 
-      <DepartmentGrid selectedDept={drawer.dept} onCardTap={handleCardTap} />
+      {/* Grid — pass icon through */}
+      <div className="grid grid-cols-3 gap-3">
+        {DEPT_CARDS.map(({ name, icon: Icon }) => (
+          <button
+            key={name}
+            type="button"
+            ref={(el) => { /* no ref needed here, rect is read on tap */ }}
+            onClick={(e) => {
+              const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+              handleCardTap(name, Icon, rect);
+            }}
+            className={[
+              'bg-white rounded-xl border shadow-sm p-3',
+              'flex flex-col items-center justify-center gap-2',
+              'min-h-[80px] cursor-pointer select-none transition-all duration-150',
+              drawer.dept === name
+                ? 'scale-[1.04] shadow-md border-[#2A7B76]'
+                : 'border-[#E5E7EB] hover:scale-[1.02]',
+            ].join(' ')}
+          >
+            <Icon size={32} className="text-[#2A7B76]" />
+            <span className="text-[14px] font-medium text-[#1A1A2E] leading-tight text-center">{name}</span>
+          </button>
+        ))}
+      </div>
 
       <div className="mt-8 flex justify-center">
         <button type="button" onClick={() => setForgotPinOpen(true)}
@@ -215,15 +249,19 @@ export default function SelectDeptPage() {
         </button>
       </div>
 
-      {/* Sheet grows from tapped card */}
+      {/* Expanding card panel — anchored to tapped card */}
       <OriginDrawer
         open={drawer.open}
         triggerRect={drawer.rect}
         onClose={closeDrawer}
-        maxHeight="88vh"
+        maxHeight="60vh"
       >
-        {drawer.dept && (
-          <UserDrawerContent deptName={drawer.dept} onClose={closeDrawer} />
+        {drawer.dept && drawer.icon && (
+          <UserPanelContent
+            deptName={drawer.dept}
+            icon={drawer.icon}
+            onClose={closeDrawer}
+          />
         )}
       </OriginDrawer>
 

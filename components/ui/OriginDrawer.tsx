@@ -1,40 +1,36 @@
 'use client';
 
 /**
- * OriginDrawer — Contextual Expansion only.
+ * OriginDrawer — Expanding Card Panel
  *
- * The panel is anchored to the tapped card and expands DOWNWARD.
- * Zero viewport math. No bottom-sheet behavior.
+ * Renders a panel fixed at the exact position of the tapped card.
+ * Only HEIGHT animates. Position never changes.
  *
- * top   = triggerRect.top   (fixed, never changes)
- * left  = triggerRect.left  (fixed, never changes)
- * width = triggerRect.width (fixed, never changes)
+ * top   = triggerRect.top                          (locked)
+ * left  = triggerRect.left                         (locked)
+ * width = clamp(triggerRect.width, 280px, 90vw)    (locked)
  *
- * Only HEIGHT animates: card.height → contentHeight
+ * height: triggerRect.height → contentH (open)
+ *         contentH → triggerRect.height (close)
  */
 
-import React, {
-  useEffect, useLayoutEffect, useRef, useState, useCallback,
-} from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState, useCallback } from 'react';
 
 export interface OriginDrawerProps {
   open: boolean;
   triggerRect: DOMRect | null;
   onClose: () => void;
   children: React.ReactNode;
-  maxHeight?: string;  // e.g. '65vh' — only used to clamp, not position
+  maxHeight?: string;
   className?: string;
 }
 
-const CLOSE_DRAG = 60;
-const CLOSE_VEL  = 0.4;
-
 type Phase = 'out' | 'measure' | 'closed' | 'open' | 'closing';
 
-function toPx(v: string, vh: number): number {
-  if (v.endsWith('vh'))  return (parseFloat(v) / 100) * vh;
+function parsePx(v: string): number {
+  if (v.endsWith('vh'))  return (parseFloat(v) / 100) * window.innerHeight;
   if (v.endsWith('px'))  return parseFloat(v);
-  return vh * 0.65;
+  return window.innerHeight * 0.60;
 }
 
 export function OriginDrawer({
@@ -42,25 +38,18 @@ export function OriginDrawer({
   triggerRect,
   onClose,
   children,
-  maxHeight = '65vh',
+  maxHeight = '60vh',
   className = '',
 }: OriginDrawerProps) {
   const [phase,    setPhase]    = useState<Phase>('out');
   const [contentH, setContentH] = useState(0);
-  const [dragY,    setDragY]    = useState(0);
-  const [dragging, setDragging] = useState(false);
+  const innerRef  = useRef<HTMLDivElement>(null);
+  const didClose  = useRef(false);
 
-  const innerRef = useRef<HTMLDivElement>(null);
-  const startY   = useRef(0);
-  const startT   = useRef(0);
-  const lastY    = useRef(0);
-  const didClose = useRef(false);
-
-  // ── lifecycle ──
+  // open → measure → closed (snap) → open (animate)
   useEffect(() => {
     if (open && triggerRect) {
       didClose.current = false;
-      setDragY(0);
       setContentH(0);
       setPhase('measure');
     } else if (!open) {
@@ -68,112 +57,102 @@ export function OriginDrawer({
     }
   }, [open, triggerRect]);
 
-  // ── measure true content height ──
   useLayoutEffect(() => {
-    if (phase !== 'measure') return;
-    if (!innerRef.current) return;
-    const maxPx = toPx(maxHeight, window.innerHeight);
-    const h     = Math.min(innerRef.current.scrollHeight, maxPx);
+    if (phase !== 'measure' || !innerRef.current) return;
+    const maxPx = parsePx(maxHeight);
+    const h = Math.min(innerRef.current.scrollHeight, maxPx);
     setContentH(h);
-    setPhase('closed');  // snap to card size (no transition)
-    requestAnimationFrame(() =>
-      requestAnimationFrame(() => setPhase('open'))  // then animate open
-    );
+    setPhase('closed');
+    requestAnimationFrame(() => requestAnimationFrame(() => setPhase('open')));
   }, [phase, maxHeight]);
 
-  // ── unmount after close animation ──
   const handleTransitionEnd = useCallback((e: React.TransitionEvent) => {
     if (e.propertyName !== 'height') return;
     if (phase === 'closing' && !didClose.current) {
       didClose.current = true;
       setPhase('out');
-      setDragY(0);
     }
   }, [phase]);
 
-  // ── swipe down to close ──
-  const onTouchStart = useCallback((e: React.TouchEvent) => {
-    startY.current = e.touches[0].clientY;
-    lastY.current  = e.touches[0].clientY;
-    startT.current = performance.now();
-    setDragging(true);
-  }, []);
-  const onTouchMove = useCallback((e: React.TouchEvent) => {
-    const dy = e.touches[0].clientY - startY.current;
-    lastY.current = e.touches[0].clientY;
-    if (dy > 0) setDragY(dy);
-  }, []);
-  const onTouchEnd = useCallback(() => {
-    setDragging(false);
-    const dy  = lastY.current - startY.current;
-    const vel = dy / Math.max(1, performance.now() - startT.current);
-    if (dy > CLOSE_DRAG || vel > CLOSE_VEL) onClose();
-    else setDragY(0);
-  }, [onClose]);
-
   if (phase === 'out' || !triggerRect) return null;
 
-  const maxPx  = toPx(maxHeight, window.innerHeight);
+  const maxPx  = parsePx(maxHeight);
   const openH  = contentH > 0 ? contentH : maxPx;
   const isOpen = phase === 'open';
 
-  // Height per phase — position NEVER changes
-  const height: number | string =
-    phase === 'measure' ? 'auto' :
-    phase === 'closed'  ? triggerRect.height :
-    phase === 'closing' ? triggerRect.height :
-    openH;  // 'open'
+  // Width: clamp so it's never narrower than 280px or wider than 90vw
+  const rawW    = triggerRect.width;
+  const clampW  = Math.min(Math.max(rawW, 280), window.innerWidth * 0.9);
+  // Re-center if width was clamped
+  const centerX = triggerRect.left + rawW / 2;
+  const finalL  = Math.max(8, Math.min(centerX - clampW / 2, window.innerWidth - clampW - 8));
 
-  const overflow = phase === 'measure' ? 'visible' : 'hidden';
-  const opacity  = phase === 'measure' ? 0 : 1;
+  const height: number =
+    phase === 'closed' || phase === 'closing'
+      ? triggerRect.height
+      : openH;
+
+  // measure phase: off-screen, invisible, auto height for scrollHeight read
+  if (phase === 'measure') {
+    return (
+      <div
+        ref={innerRef}
+        style={{
+          position: 'fixed',
+          top: -9999,
+          left: finalL,
+          width: clampW,
+          height: 'auto',
+          overflow: 'visible',
+          opacity: 0,
+          pointerEvents: 'none',
+          zIndex: -1,
+        }}
+      >
+        {children}
+      </div>
+    );
+  }
 
   const transition =
-    phase === 'measure' || phase === 'closed' || dragging
+    phase === 'closed'
       ? 'none'
       : isOpen
-        ? 'height 300ms cubic-bezier(0.34,1.2,0.64,1)'
-        : 'height 200ms ease-in';
+        ? 'height 280ms cubic-bezier(0.34,1.15,0.64,1), box-shadow 280ms ease'
+        : 'height 200ms ease-in, box-shadow 200ms ease';
 
-  const backdropOpacity = isOpen ? Math.max(0, 1 - dragY / 160) : 0;
+  const backdropOpacity = isOpen ? 0.3 : 0;
 
   return (
     <>
-      {/* Backdrop — tap to close */}
+      {/* Backdrop */}
       <div
         className="fixed inset-0 z-40"
         style={{
-          backgroundColor: 'rgba(0,0,0,0.35)',
-          opacity: backdropOpacity,
-          transition: dragging ? 'none' : 'opacity 250ms ease',
+          background: 'rgba(0,0,0,' + backdropOpacity + ')',
+          transition: 'background 250ms ease',
           pointerEvents: isOpen ? 'auto' : 'none',
         }}
         onClick={onClose}
         aria-hidden="true"
       />
 
-      {/* Panel — anchored to card, grows downward */}
+      {/* Panel — position locked to card */}
       <div
         role="dialog"
         aria-modal="true"
-        className={['fixed z-50 bg-white shadow-xl rounded-xl overflow-hidden', className].join(' ')}
+        className={['fixed z-50 bg-white rounded-xl shadow-2xl overflow-hidden', className].join(' ')}
         style={{
           top:    triggerRect.top,
-          left:   triggerRect.left,
-          width:  triggerRect.width,
+          left:   finalL,
+          width:  clampW,
           height,
-          overflow,
-          opacity,
           transition,
           willChange: 'height',
-          touchAction: 'none',
         }}
-        onTouchStart={onTouchStart}
-        onTouchMove={onTouchMove}
-        onTouchEnd={onTouchEnd}
         onTransitionEnd={handleTransitionEnd}
       >
-        {/* Inner div — ref for scrollHeight measurement */}
-        <div ref={innerRef} className="flex flex-col">
+        <div ref={phase !== 'measure' ? innerRef : undefined} className="flex flex-col">
           {children}
         </div>
       </div>
