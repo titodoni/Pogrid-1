@@ -1,10 +1,11 @@
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
+import { persist, createJSONStorage } from 'zustand/middleware';
 
-// ─── Interface ──────────────────────────────────────────────────────────────────
+// ─── Interface ───────────────────────────────────────────────────────────────────────────
 
 export interface UIStore {
-  // ── 1. Session (mock auth) ───────────────────────────────────────────────
+  // ── 1. Session (mock auth) ───────────────────────────────────────────
   session: {
     userId: string;
     name: string;
@@ -34,7 +35,7 @@ export interface UIStore {
   setUndoFailed(itemId: string, failed: boolean): void;
   incrementRetryCount(itemId: string): void;
 
-  // ── 3. Bottom Sheets ────────────────────────────────────────────────
+  // ── 3. Bottom Sheets ────────────────────────────────────────────────────
   activeBottomSheet:
     | 'qc-gate'
     | 'delivery-gate'
@@ -47,27 +48,27 @@ export interface UIStore {
   openBottomSheet(sheet: UIStore['activeBottomSheet'], itemId: string): void;
   closeBottomSheet(): void;
 
-  // ── 4. Connection Status ───────────────────────────────────────────
+  // ── 4. Connection Status ───────────────────────────────────────────────
   connectionStatus: 'online' | 'offline' | 'reconnecting';
   setConnectionStatus(status: UIStore['connectionStatus']): void;
 
-  // ── 5. Board Filters ───────────────────────────────────────────────
+  // ── 5. Board Filters ───────────────────────────────────────────────────
   boardFilters: string[];
   setBoardFilters(filters: string[]): void;
   toggleBoardFilter(filter: string): void;
 
-  // ── 6. My Jobs Display (Phase 0 compat) ─────────────────────────────
+  // ── 6. My Jobs Display (Phase 0 compat) ────────────────────────────────
   showCompleted: boolean;
   toggleShowCompleted(): void;
   hariIniActive: boolean;
   toggleHariIni(): void;
 
-  // ── 7. Local Item Progress ───────────────────────────────────────────
+  // ── 7. Local Item Progress ───────────────────────────────────────────────
   localProgress: Record<string, number>;
   setLocalProgress(itemId: string, value: number): void;
   clearLocalProgress(itemId: string): void;
 
-  // ── 8. Select-Dept Screen State ───────────────────────────────────────
+  // ── 8. Select-Dept Screen State ──────────────────────────────────────────
   selectedDept: string | null;
   drawerOpen: boolean;
   forgotPinOpen: boolean;
@@ -75,7 +76,7 @@ export interface UIStore {
   setDrawerOpen(open: boolean): void;
   setForgotPinOpen(open: boolean): void;
 
-  // ── 9. Phase 1 — Floor State Machine ─────────────────────────────────
+  // ── 9. Phase 1 — Floor State Machine ──────────────────────────────────────
   expandedItemId: string | null;
   setExpandedItemId(id: string | null): void;
 
@@ -92,128 +93,138 @@ export interface UIStore {
   setNotificationCount(n: number): void;
 }
 
-// ─── Store ─────────────────────────────────────────────────────────────────────
+// ─── Store ──────────────────────────────────────────────────────────────────────────────
 
-const useUIStore = create<UIStore>()(immer((set) => ({
+const useUIStore = create<UIStore>()(
+  persist(
+    immer((set) => ({
 
-  // ── 1. Session ────────────────────────────────────────────────────────
-  session: null,
-  setSession(session) {
-    set((draft) => { draft.session = session; });
-  },
-  clearSession() {
-    set((draft) => { draft.session = null; });
-  },
+      // ── 1. Session ────────────────────────────────────────────────────────────
+      session: null,
+      setSession(session) {
+        set((draft) => { draft.session = session; });
+      },
+      clearSession() {
+        set((draft) => { draft.session = null; });
+      },
 
-  // ── 2. BatalkanControl ─────────────────────────────────────────────────
-  pendingProgress: {},
-  setPendingProgress(itemId, previous, timeoutRef) {
-    set((draft) => {
-      draft.pendingProgress[itemId] = { previous, timeoutRef, failedUndo: false, retryCount: 0 };
-    });
-  },
-  clearPendingProgress(itemId) {
-    set((draft) => { delete draft.pendingProgress[itemId]; });
-  },
-  setUndoFailed(itemId, failed) {
-    set((draft) => {
-      if (draft.pendingProgress[itemId]) draft.pendingProgress[itemId].failedUndo = failed;
-    });
-  },
-  incrementRetryCount(itemId) {
-    set((draft) => {
-      if (draft.pendingProgress[itemId]) draft.pendingProgress[itemId].retryCount += 1;
-    });
-  },
+      // ── 2. BatalkanControl ────────────────────────────────────────────────────
+      pendingProgress: {},
+      setPendingProgress(itemId, previous, timeoutRef) {
+        set((draft) => {
+          draft.pendingProgress[itemId] = { previous, timeoutRef, failedUndo: false, retryCount: 0 };
+        });
+      },
+      clearPendingProgress(itemId) {
+        set((draft) => { delete draft.pendingProgress[itemId]; });
+      },
+      setUndoFailed(itemId, failed) {
+        set((draft) => {
+          if (draft.pendingProgress[itemId]) draft.pendingProgress[itemId].failedUndo = failed;
+        });
+      },
+      incrementRetryCount(itemId) {
+        set((draft) => {
+          if (draft.pendingProgress[itemId]) draft.pendingProgress[itemId].retryCount += 1;
+        });
+      },
 
-  // ── 3. Bottom Sheets ────────────────────────────────────────────────
-  activeBottomSheet: null,
-  bottomSheetItemId: null,
-  openBottomSheet(sheet, itemId) {
-    set((draft) => { draft.activeBottomSheet = sheet; draft.bottomSheetItemId = itemId; });
-  },
-  closeBottomSheet() {
-    set((draft) => { draft.activeBottomSheet = null; draft.bottomSheetItemId = null; });
-  },
+      // ── 3. Bottom Sheets ────────────────────────────────────────────────────
+      activeBottomSheet: null,
+      bottomSheetItemId: null,
+      openBottomSheet(sheet, itemId) {
+        set((draft) => { draft.activeBottomSheet = sheet; draft.bottomSheetItemId = itemId; });
+      },
+      closeBottomSheet() {
+        set((draft) => { draft.activeBottomSheet = null; draft.bottomSheetItemId = null; });
+      },
 
-  // ── 4. Connection Status ───────────────────────────────────────────
-  connectionStatus: 'online',
-  setConnectionStatus(status) {
-    set((draft) => { draft.connectionStatus = status; });
-  },
+      // ── 4. Connection Status ───────────────────────────────────────────────
+      connectionStatus: 'online',
+      setConnectionStatus(status) {
+        set((draft) => { draft.connectionStatus = status; });
+      },
 
-  // ── 5. Board Filters ───────────────────────────────────────────────
-  boardFilters: [],
-  setBoardFilters(filters) {
-    set((draft) => { draft.boardFilters = filters; });
-  },
-  toggleBoardFilter(filter) {
-    set((draft) => {
-      const idx = draft.boardFilters.indexOf(filter);
-      if (idx === -1) draft.boardFilters.push(filter);
-      else draft.boardFilters.splice(idx, 1);
-    });
-  },
+      // ── 5. Board Filters ───────────────────────────────────────────────────
+      boardFilters: [],
+      setBoardFilters(filters) {
+        set((draft) => { draft.boardFilters = filters; });
+      },
+      toggleBoardFilter(filter) {
+        set((draft) => {
+          const idx = draft.boardFilters.indexOf(filter);
+          if (idx === -1) draft.boardFilters.push(filter);
+          else draft.boardFilters.splice(idx, 1);
+        });
+      },
 
-  // ── 6. My Jobs Display ─────────────────────────────────────────────
-  showCompleted: false,
-  toggleShowCompleted() {
-    set((draft) => { draft.showCompleted = !draft.showCompleted; });
-  },
-  hariIniActive: true,
-  toggleHariIni() {
-    set((draft) => { draft.hariIniActive = !draft.hariIniActive; });
-  },
+      // ── 6. My Jobs Display ───────────────────────────────────────────────────
+      showCompleted: false,
+      toggleShowCompleted() {
+        set((draft) => { draft.showCompleted = !draft.showCompleted; });
+      },
+      hariIniActive: true,
+      toggleHariIni() {
+        set((draft) => { draft.hariIniActive = !draft.hariIniActive; });
+      },
 
-  // ── 7. Local Item Progress ───────────────────────────────────────────
-  localProgress: {},
-  setLocalProgress(itemId, value) {
-    set((draft) => { draft.localProgress[itemId] = value; });
-  },
-  clearLocalProgress(itemId) {
-    set((draft) => { delete draft.localProgress[itemId]; });
-  },
+      // ── 7. Local Item Progress ───────────────────────────────────────────────
+      localProgress: {},
+      setLocalProgress(itemId, value) {
+        set((draft) => { draft.localProgress[itemId] = value; });
+      },
+      clearLocalProgress(itemId) {
+        set((draft) => { delete draft.localProgress[itemId]; });
+      },
 
-  // ── 8. Select-Dept ───────────────────────────────────────────────────
-  selectedDept: null,
-  drawerOpen: false,
-  forgotPinOpen: false,
-  setSelectedDept(dept) {
-    set((draft) => { draft.selectedDept = dept; });
-  },
-  setDrawerOpen(open) {
-    set((draft) => { draft.drawerOpen = open; });
-  },
-  setForgotPinOpen(open) {
-    set((draft) => { draft.forgotPinOpen = open; });
-  },
+      // ── 8. Select-Dept ─────────────────────────────────────────────────────────────
+      selectedDept: null,
+      drawerOpen: false,
+      forgotPinOpen: false,
+      setSelectedDept(dept) {
+        set((draft) => { draft.selectedDept = dept; });
+      },
+      setDrawerOpen(open) {
+        set((draft) => { draft.drawerOpen = open; });
+      },
+      setForgotPinOpen(open) {
+        set((draft) => { draft.forgotPinOpen = open; });
+      },
 
-  // ── 9. Phase 1 — Floor State Machine ──────────────────────────────────
-  expandedItemId: null,
-  setExpandedItemId(id) {
-    set((draft) => { draft.expandedItemId = id; });
-  },
+      // ── 9. Phase 1 — Floor State Machine ──────────────────────────────────────
+      expandedItemId: null,
+      setExpandedItemId(id) {
+        set((draft) => { draft.expandedItemId = id; });
+      },
 
-  selectedSegment: 'active',
-  setSelectedSegment(seg) {
-    set((draft) => { draft.selectedSegment = seg; });
-  },
+      selectedSegment: 'active',
+      setSelectedSegment(seg) {
+        set((draft) => { draft.selectedSegment = seg; });
+      },
 
-  selectedMonth: new Date().toISOString().slice(0, 7), // 'YYYY-MM'
-  setSelectedMonth(month) {
-    set((draft) => { draft.selectedMonth = month; });
-  },
+      selectedMonth: new Date().toISOString().slice(0, 7),
+      setSelectedMonth(month) {
+        set((draft) => { draft.selectedMonth = month; });
+      },
 
-  searchQuery: '',
-  setSearchQuery(q) {
-    set((draft) => { draft.searchQuery = q; });
-  },
+      searchQuery: '',
+      setSearchQuery(q) {
+        set((draft) => { draft.searchQuery = q; });
+      },
 
-  notificationCount: 3,
-  setNotificationCount(n) {
-    set((draft) => { draft.notificationCount = n; });
-  },
+      notificationCount: 3,
+      setNotificationCount(n) {
+        set((draft) => { draft.notificationCount = n; });
+      },
 
-})));
+    })),
+    {
+      name: 'pogrid-session',
+      storage: createJSONStorage(() => sessionStorage),
+      // Hanya persist field session — state UI lain tidak perlu survive reload
+      partialize: (state) => ({ session: state.session }),
+    },
+  )
+);
 
 export default useUIStore;
