@@ -5,7 +5,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import {
   Pencil, ShoppingCart, Settings, Flame, ShieldCheck,
   Truck, Cog, BarChart2, Briefcase,
-  Phone, Mail, MessageCircle, X, ChevronLeft,
+  Phone, Mail, MessageCircle, X,
   type LucideIcon,
 } from 'lucide-react';
 import { mockUsers } from '@/lib/mockData';
@@ -70,47 +70,7 @@ function ForgotPinSheet({ onClose }: { onClose: () => void }) {
   );
 }
 
-// ─── DepartmentGrid ───────────────────────────────────────────────────────
-function DepartmentGrid({
-  selectedDept,
-  onCardTap,
-}: {
-  selectedDept: string | null;
-  onCardTap: (name: string, rect: DOMRect) => void;
-}) {
-  const cardRefs = useRef<Record<string, HTMLButtonElement | null>>({});
-  function handleTap(name: string) {
-    const el   = cardRefs.current[name];
-    const rect = el?.getBoundingClientRect() ?? null;
-    if (rect) onCardTap(name, rect);
-  }
-  return (
-    <div className="grid grid-cols-3 gap-3">
-      {DEPT_CARDS.map(({ name, icon: Icon }) => (
-        <button
-          key={name}
-          type="button"
-          ref={(el) => { cardRefs.current[name] = el; }}
-          onClick={() => handleTap(name)}
-          className={[
-            'bg-white rounded-xl border shadow-sm p-3',
-            'flex flex-col items-center justify-center gap-2',
-            'min-h-[80px] cursor-pointer select-none transition-all duration-150',
-            selectedDept === name
-              ? 'scale-[1.04] shadow-md border-[#2A7B76]'
-              : 'border-[#E5E7EB] hover:scale-[1.02]',
-          ].join(' ')}
-        >
-          <Icon size={32} className="text-[#2A7B76]" />
-          <span className="text-[14px] font-medium text-[#1A1A2E] leading-tight text-center">{name}</span>
-        </button>
-      ))}
-    </div>
-  );
-}
-
 // ─── UserPanelContent ────────────────────────────────────────────────────
-// Card header + user list — the card IS the header
 function UserPanelContent({ deptName, icon: Icon, onClose }: {
   deptName: string;
   icon: LucideIcon;
@@ -216,13 +176,12 @@ export default function SelectDeptPage() {
         <h1 className="text-2xl font-bold text-[#1A1A2E] text-center mt-4">Pilih Departemen</h1>
       </div>
 
-      {/* Grid — pass icon through */}
+      {/* Grid */}
       <div className="grid grid-cols-3 gap-3">
         {DEPT_CARDS.map(({ name, icon: Icon }) => (
           <button
             key={name}
             type="button"
-            ref={(el) => { /* no ref needed here, rect is read on tap */ }}
             onClick={(e) => {
               const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
               handleCardTap(name, Icon, rect);
