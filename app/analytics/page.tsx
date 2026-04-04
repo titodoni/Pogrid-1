@@ -22,7 +22,7 @@ export default function AnalyticsPage() {
       department={session.department}
       headerTitle="Analytics"
       headerLeft={
-        <ProfileAvatar name={session.name} onClick={() => {}} />
+        <ProfileAvatar name={session.name} />
       }
     >
       <div className="flex items-center justify-center h-40">
