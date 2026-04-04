@@ -1,0 +1,151 @@
+'use client';
+
+import React, { useState } from 'react';
+import { type MockItem } from '@/lib/mockData';
+import StageBadge from './StageBadge';
+import { VendorPill, RoutingPill, ReworkPill, ReturnPill } from './PillBadges';
+import ProgressSlider from './ProgressSlider';
+import StepperControl from './StepperControl';
+import BatalkanControl from './BatalkanControl';
+
+interface ItemCardProps {
+  item: MockItem;
+  isWorkerView: boolean;
+  isOwnerStage: boolean;
+  currentUserId: string;
+  onProgressChange: (itemId: string, newProgress: number) => void;
+  onSaveProgress: (itemId: string, newProgress: number, previousProgress: number) => void;
+  onOpenIssueSheet: (itemId: string) => void;
+  onOpenGateSheet: (itemId: string) => void;
+}
+
+export default function ItemCard({
+  item,
+  isWorkerView,
+  isOwnerStage,
+  onSaveProgress,
+  onOpenIssueSheet,
+  onOpenGateSheet,
+}: ItemCardProps) {
+  // Only one useState allowed in this component — localProgress
+  const [localProgress, setLocalProgress] = useState(item.progress);
+
+  const isInteractive = isWorkerView && isOwnerStage && !item.allNG;
+  const hasUnsaved = localProgress !== item.progress;
+
+  // Ref injection from BatalkanControl — lets parent trigger STATE 3
+  let startTimerFn: ((prev: number) => void) | null = null;
+
+  function handleSave() {
+    const previous = item.progress;
+    const isComplete =
+      (item.qty === 1 && localProgress === 100) ||
+      (item.qty > 1 && localProgress === item.qty);
+
+    // Update in-memory mockItems
+    item.progress = localProgress;
+    item.updatedAt = new Date().toISOString();
+
+    // Trigger BatalkanControl STATE 3
+    if (startTimerFn) startTimerFn(previous);
+
+    onSaveProgress(item.id, localProgress, previous);
+
+    if (isComplete) {
+      // Phase 2 stub — gate sheet
+      onOpenGateSheet(item.id);
+    }
+  }
+
+  function handleUndo() {
+    setLocalProgress(item.progress);
+  }
+
+  const dueDateStr = new Date(item.po.deliveryDate).toLocaleDateString('id-ID', {
+    day: 'numeric', month: 'short', year: 'numeric',
+  });
+
+  return (
+    <div className="bg-white rounded-xl border border-[#E5E7EB] p-4 mb-3 transition-all duration-250">
+      {/* Row 1 — Header */}
+      <div className="flex justify-between items-center">
+        <span className="text-xs text-[#6B7280] font-normal">{item.po.number}</span>
+        <StageBadge item={item} />
+      </div>
+
+      {/* Row 2 — Item name */}
+      <p className="text-lg font-semibold text-[#1A1A2E] mt-1">{item.name}</p>
+
+      {/* Row 3 — Client name */}
+      <p className="text-[13px] text-[#6B7280] mt-0.5">{item.po.clientName} · Due {dueDateStr}</p>
+
+      {/* Row 4 — Pills */}
+      <div className="flex gap-1 flex-wrap mt-2">
+        <ReworkPill parentItemId={item.parentItemId} parentName={item.parent?.name} />
+        <ReturnPill source={item.source} returnBreadcrumb={item.returnBreadcrumb} />
+        <VendorPill vendorJob={item.vendorJob} />
+        <RoutingPill productionType={item.productionType} />
+      </div>
+
+      <hr className="border-[#E5E7EB] my-3" />
+
+      {/* Row 5 — Progress Control */}
+      {item.allNG ? (
+        <p className="text-[13px] text-[#B33941] font-medium">Semua unit gagal QC</p>
+      ) : isInteractive ? (
+        item.qty === 1
+          ? <ProgressSlider value={localProgress} onChange={setLocalProgress} />
+          : <StepperControl current={localProgress} max={item.qty} onChange={setLocalProgress} />
+      ) : (
+        // Read-only
+        item.qty === 1 ? (
+          <div className="flex items-center gap-3 opacity-70">
+            <div className="flex-1 h-2 rounded-full bg-[#E5E7EB]">
+              <div
+                className="h-2 rounded-full bg-[#2A7B76]"
+                style={{ width: `${localProgress}%` }}
+              />
+            </div>
+            <span className="text-sm font-medium text-[#1A1A2E]" style={{ minWidth: 40 }}>{localProgress}%</span>
+          </div>
+        ) : (
+          <p className="text-base font-medium text-[#1A1A2E] text-center opacity-70">
+            {localProgress} / {item.qty} units
+          </p>
+        )
+      )}
+
+      {/* Row 6 — Action footer (interactive only) */}
+      {isInteractive && (
+        <>
+          <hr className="border-[#E5E7EB] my-3" />
+          <div className="flex justify-between items-center">
+            <BatalkanControl
+              itemId={item.id}
+              onUndo={handleUndo}
+              onStartTimer={(fn) => { startTimerFn = fn; }}
+            />
+            <div className="flex items-center gap-2">
+              {hasUnsaved && (
+                <button
+                  type="button"
+                  onClick={handleSave}
+                  className="rounded-lg px-4 h-10 text-sm font-medium bg-[#2A7B76] text-white"
+                >
+                  Simpan
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => onOpenIssueSheet(item.id)}
+                className="text-[#B33941] text-sm font-medium px-2"
+              >
+                🚩 Laporkan
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}

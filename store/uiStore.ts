@@ -56,7 +56,7 @@ export interface UIStore {
   setBoardFilters(filters: string[]): void;
   toggleBoardFilter(filter: string): void;
 
-  // ── 6. My Jobs Display ─────────────────────────────────────────────
+  // ── 6. My Jobs Display (Phase 0 compat) ─────────────────────────────
   showCompleted: boolean;
   toggleShowCompleted(): void;
   hariIniActive: boolean;
@@ -67,13 +67,29 @@ export interface UIStore {
   setLocalProgress(itemId: string, value: number): void;
   clearLocalProgress(itemId: string): void;
 
-  // ── 8. Select-Dept Screen State (Amendment #13) ───────────────────────
+  // ── 8. Select-Dept Screen State ───────────────────────────────────────
   selectedDept: string | null;
   drawerOpen: boolean;
   forgotPinOpen: boolean;
   setSelectedDept(dept: string | null): void;
   setDrawerOpen(open: boolean): void;
   setForgotPinOpen(open: boolean): void;
+
+  // ── 9. Phase 1 — Floor State Machine ─────────────────────────────────
+  expandedItemId: string | null;
+  setExpandedItemId(id: string | null): void;
+
+  selectedSegment: 'active' | 'archive';
+  setSelectedSegment(seg: 'active' | 'archive'): void;
+
+  selectedMonth: string; // 'YYYY-MM'
+  setSelectedMonth(month: string): void;
+
+  searchQuery: string;
+  setSearchQuery(q: string): void;
+
+  notificationCount: number;
+  setNotificationCount(n: number): void;
 }
 
 // ─── Store ─────────────────────────────────────────────────────────────────────
@@ -82,7 +98,6 @@ const useUIStore = create<UIStore>()(immer((set) => ({
 
   // ── 1. Session ────────────────────────────────────────────────────────
   session: null,
-
   setSession(session) {
     set((draft) => { draft.session = session; });
   },
@@ -92,7 +107,6 @@ const useUIStore = create<UIStore>()(immer((set) => ({
 
   // ── 2. BatalkanControl ─────────────────────────────────────────────────
   pendingProgress: {},
-
   setPendingProgress(itemId, previous, timeoutRef) {
     set((draft) => {
       draft.pendingProgress[itemId] = { previous, timeoutRef, failedUndo: false, retryCount: 0 };
@@ -115,7 +129,6 @@ const useUIStore = create<UIStore>()(immer((set) => ({
   // ── 3. Bottom Sheets ────────────────────────────────────────────────
   activeBottomSheet: null,
   bottomSheetItemId: null,
-
   openBottomSheet(sheet, itemId) {
     set((draft) => { draft.activeBottomSheet = sheet; draft.bottomSheetItemId = itemId; });
   },
@@ -125,14 +138,12 @@ const useUIStore = create<UIStore>()(immer((set) => ({
 
   // ── 4. Connection Status ───────────────────────────────────────────
   connectionStatus: 'online',
-
   setConnectionStatus(status) {
     set((draft) => { draft.connectionStatus = status; });
   },
 
   // ── 5. Board Filters ───────────────────────────────────────────────
   boardFilters: [],
-
   setBoardFilters(filters) {
     set((draft) => { draft.boardFilters = filters; });
   },
@@ -156,7 +167,6 @@ const useUIStore = create<UIStore>()(immer((set) => ({
 
   // ── 7. Local Item Progress ───────────────────────────────────────────
   localProgress: {},
-
   setLocalProgress(itemId, value) {
     set((draft) => { draft.localProgress[itemId] = value; });
   },
@@ -164,11 +174,10 @@ const useUIStore = create<UIStore>()(immer((set) => ({
     set((draft) => { delete draft.localProgress[itemId]; });
   },
 
-  // ── 8. Select-Dept Screen State (Amendment #13) ───────────────────────
+  // ── 8. Select-Dept ───────────────────────────────────────────────────
   selectedDept: null,
   drawerOpen: false,
   forgotPinOpen: false,
-
   setSelectedDept(dept) {
     set((draft) => { draft.selectedDept = dept; });
   },
@@ -177,6 +186,32 @@ const useUIStore = create<UIStore>()(immer((set) => ({
   },
   setForgotPinOpen(open) {
     set((draft) => { draft.forgotPinOpen = open; });
+  },
+
+  // ── 9. Phase 1 — Floor State Machine ──────────────────────────────────
+  expandedItemId: null,
+  setExpandedItemId(id) {
+    set((draft) => { draft.expandedItemId = id; });
+  },
+
+  selectedSegment: 'active',
+  setSelectedSegment(seg) {
+    set((draft) => { draft.selectedSegment = seg; });
+  },
+
+  selectedMonth: new Date().toISOString().slice(0, 7), // 'YYYY-MM'
+  setSelectedMonth(month) {
+    set((draft) => { draft.selectedMonth = month; });
+  },
+
+  searchQuery: '',
+  setSearchQuery(q) {
+    set((draft) => { draft.searchQuery = q; });
+  },
+
+  notificationCount: 3,
+  setNotificationCount(n) {
+    set((draft) => { draft.notificationCount = n; });
   },
 
 })));

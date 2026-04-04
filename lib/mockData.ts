@@ -1,6 +1,6 @@
-// ─── POGrid Mock Data Foundation ────────────────────────────────────────────
-// Phase 0 — drives all UI simulation in Phases 0–3.
-// No imports. Fully self-contained.
+// ─── POGrid Mock Data — Phase 1 Foundation ──────────────────────────────────
+// Mode: Mock-only. No imports from external libs. Fully self-contained.
+// mockItems exported as `let` — allows in-memory mutation during mock session.
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -10,6 +10,7 @@ export interface MockUser {
   department: string;
   role: string;
   pin: string;
+  active: boolean;
 }
 
 export interface MockDepartment {
@@ -26,13 +27,27 @@ export interface MockPO {
   status: string;
   urgent: boolean;
   notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface MockIssue {
+  id: string;
+  reason: string;
+  resolved: boolean;
+  filedById: string;
+}
+
+export interface MockStageBreakdown {
+  stage: string;
+  progress: number;
+  isStalled: boolean;
 }
 
 export interface MockItem {
   id: string;
   poId: string;
-  poNumber: string;
-  clientName: string;
+  po: { number: string; clientName: string; deliveryDate: string; urgent: boolean };
   name: string;
   qty: number;
   progress: number;
@@ -43,11 +58,16 @@ export interface MockItem {
   allNG: boolean;
   parentItemId: string | null;
   parent: { name: string } | null;
-  invoiceStatus: string;
-  source: string | null;
+  source: 'RETURN' | null;
   returnBreadcrumb: string | null;
-  issues: { resolved: boolean }[];
+  invoiceStatus: string;
   notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+  lastEventLabel: string;
+  lastEventTime: string;
+  issues: MockIssue[];
+  stageBreakdown: MockStageBreakdown[];
 }
 
 export interface MockSession {
@@ -58,116 +78,26 @@ export interface MockSession {
   isLoggedIn: boolean;
 }
 
-// ─── Export 1: mockUsers ─────────────────────────────────────────────────────
-// Rule: floor department → role "worker" | management role → role matches name
+// ─── mockUsers ───────────────────────────────────────────────────────────────
 
 export const mockUsers: MockUser[] = [
-  // Floor workers — role is always "worker"
-  {
-    id: 'user-budi',
-    name: 'Budi Santoso',
-    department: 'Drafting',
-    role: 'worker',
-    pin: '0000',
-  },
-  {
-    id: 'user-siti',
-    name: 'Siti Rahayu',
-    department: 'Purchasing',
-    role: 'worker',
-    pin: '0000',
-  },
-  // Machining — 2 users to show multi-user department
-  {
-    id: 'user-ahmad',
-    name: 'Ahmad Fauzi',
-    department: 'Machining',
-    role: 'worker',
-    pin: '0000',
-  },
-  {
-    id: 'user-rizki',
-    name: 'Rizki Pratama',
-    department: 'Machining',
-    role: 'worker',
-    pin: '0000',
-  },
-  {
-    id: 'user-hendra',
-    name: 'Hendra Wijaya',
-    department: 'Fabrikasi',
-    role: 'worker',
-    pin: '0000',
-  },
-  // QC — 2 users to show multi-user department
-  {
-    id: 'user-dewi',
-    name: 'Dewi Kusuma',
-    department: 'QC',
-    role: 'worker',
-    pin: '0000',
-  },
-  {
-    id: 'user-eko',
-    name: 'Eko Purnomo',
-    department: 'QC',
-    role: 'worker',
-    pin: '0000',
-  },
-  {
-    id: 'user-yusuf',
-    name: 'Yusuf Hidayat',
-    department: 'Delivery',
-    role: 'worker',
-    pin: '0000',
-  },
-  // Management / support roles
-  {
-    id: 'user-admin',
-    name: 'Agus Setiawan',
-    department: 'Admin',
-    role: 'admin',
-    pin: '0000',
-  },
-  {
-    id: 'user-manager',
-    name: 'Bambang Suryadi',
-    department: 'Manager',
-    role: 'manager',
-    pin: '0000',
-  },
-  {
-    id: 'user-sales',
-    name: 'Ratna Sari',
-    department: 'Sales',
-    role: 'sales',
-    pin: '0000',
-  },
-  {
-    id: 'user-finance',
-    name: 'Lestari Ningrum',
-    department: 'Finance',
-    role: 'finance',
-    pin: '0000',
-  },
-  // Extra floor workers to reach 14 total
-  {
-    id: 'user-wahyu',
-    name: 'Wahyu Nugroho',
-    department: 'Fabrikasi',
-    role: 'worker',
-    pin: '0000',
-  },
-  {
-    id: 'user-fitri',
-    name: 'Fitri Anggraeni',
-    department: 'Drafting',
-    role: 'worker',
-    pin: '0000',
-  },
+  { id: 'user-drafter-01',   name: 'Budi Santoso',    department: 'Drafting',   role: 'worker',  pin: '1234', active: true },
+  { id: 'user-drafter-02',   name: 'Fitri Anggraeni', department: 'Drafting',   role: 'worker',  pin: '1234', active: true },
+  { id: 'user-purchasing-01',name: 'Siti Rahayu',     department: 'Purchasing', role: 'worker',  pin: '1234', active: true },
+  { id: 'user-machining-01', name: 'Ahmad Fauzi',     department: 'Machining',  role: 'worker',  pin: '1234', active: true },
+  { id: 'user-machining-02', name: 'Rizki Pratama',   department: 'Machining',  role: 'worker',  pin: '1234', active: true },
+  { id: 'user-fabrikasi-01', name: 'Hendra Wijaya',   department: 'Fabrikasi',  role: 'worker',  pin: '1234', active: true },
+  { id: 'user-fabrikasi-02', name: 'Wahyu Nugroho',   department: 'Fabrikasi',  role: 'worker',  pin: '1234', active: true },
+  { id: 'user-qc-01',        name: 'Dewi Kusuma',     department: 'QC',         role: 'worker',  pin: '1234', active: true },
+  { id: 'user-qc-02',        name: 'Eko Purnomo',     department: 'QC',         role: 'worker',  pin: '1234', active: true },
+  { id: 'user-delivery-01',  name: 'Yusuf Hidayat',   department: 'Delivery',   role: 'worker',  pin: '1234', active: true },
+  { id: 'user-admin-01',     name: 'Agus Setiawan',   department: 'Admin',      role: 'admin',   pin: '0000', active: true },
+  { id: 'user-manager-01',   name: 'Bambang Suryadi', department: 'Manager',    role: 'manager', pin: '1234', active: true },
+  { id: 'user-sales-01',     name: 'Ratna Sari',      department: 'Sales',      role: 'sales',   pin: '1234', active: true },
+  { id: 'user-finance-01',   name: 'Lestari Ningrum', department: 'Finance',    role: 'finance', pin: '1234', active: true },
 ];
 
-// ─── Export 2: mockDepartments ───────────────────────────────────────────────
+// ─── mockDepartments ─────────────────────────────────────────────────────────
 
 export const mockDepartments: MockDepartment[] = [
   { id: 'dept-drafting',   name: 'Drafting',   active: true },
@@ -182,347 +112,313 @@ export const mockDepartments: MockDepartment[] = [
   { id: 'role-finance',    name: 'Finance',    active: true },
 ];
 
-// ─── Export 3: mockPOs ───────────────────────────────────────────────────────
+// ─── mockPOs ─────────────────────────────────────────────────────────────────
 
 export const mockPOs: MockPO[] = [
   {
     id: 'po-001',
     number: 'PO-2026-001',
-    clientName: 'PT. Maju Jaya Teknik',
-    deliveryDate: '2026-04-30T00:00:00.000Z',
+    clientName: 'PT. Maju Jaya',
+    deliveryDate: '2026-05-30T00:00:00.000Z',
     status: 'ACTIVE',
-    urgent: false,
+    urgent: true,
     notes: null,
+    createdAt: '2026-04-01T08:00:00.000Z',
+    updatedAt: '2026-04-01T08:00:00.000Z',
   },
   {
     id: 'po-002',
     number: 'PO-2026-002',
-    clientName: 'CV. Karya Mandiri',
-    deliveryDate: '2026-04-10T00:00:00.000Z',
+    clientName: 'CV. Karya Bersama',
+    deliveryDate: '2026-03-15T00:00:00.000Z',
     status: 'PARTIAL',
-    urgent: true,   // ← all items in this PO inherit urgent: true
-    notes: 'Prioritas tinggi — klien butuh segera',
+    urgent: false,
+    notes: 'Prioritas klien lama',
+    createdAt: '2026-03-01T08:00:00.000Z',
+    updatedAt: '2026-03-20T10:00:00.000Z',
   },
   {
     id: 'po-003',
     number: 'PO-2026-003',
-    clientName: 'PT. Nusantara Industri',
-    deliveryDate: '2026-03-15T00:00:00.000Z', // past date → LATE
-    status: 'LATE',
+    clientName: 'PT. Sinar Teknik',
+    deliveryDate: '2026-06-15T00:00:00.000Z',
+    status: 'ACTIVE',
     urgent: false,
-    notes: 'Pengiriman tertunda akibat kekurangan material',
+    notes: null,
+    createdAt: '2026-04-02T09:00:00.000Z',
+    updatedAt: '2026-04-02T09:00:00.000Z',
   },
 ];
 
-// ─── Export 4: mockItems ─────────────────────────────────────────────────────
+// ─── mockItems (use let — allows in-memory mutation) ─────────────────────────
 
-export const mockItems: MockItem[] = [
-  // ── PO-2026-001 items ────────────────────────────────────────────────────
+export let mockItems: MockItem[] = [
   {
-    id: 'item-001',
+    id: 'item-01',
     poId: 'po-001',
-    poNumber: 'PO-2026-001',
-    clientName: 'PT. Maju Jaya Teknik',
-    name: 'Bracket Dudukan Mesin',
-    qty: 1,
-    progress: 30,
-    stage: 'DRAFTING',           // scenario: DRAFTING
-    productionType: 'machining',
-    vendorJob: false,
-    urgent: false,
-    allNG: false,
-    parentItemId: null,
-    parent: null,
-    invoiceStatus: 'UNPAID',
-    source: null,
-    returnBreadcrumb: null,
+    po: { number: 'PO-2026-001', clientName: 'PT. Maju Jaya', deliveryDate: '2026-05-30T00:00:00.000Z', urgent: true },
+    name: 'Bracket Siku A',
+    qty: 1, progress: 0, stage: 'DRAFTING',
+    productionType: 'machining', vendorJob: false, urgent: true, allNG: false,
+    parentItemId: null, parent: null, source: null, returnBreadcrumb: null,
+    invoiceStatus: 'UNPAID', notes: null,
+    createdAt: '2026-04-01T08:00:00.000Z', updatedAt: '2026-04-01T08:30:00.000Z',
+    lastEventLabel: 'Item dibuat', lastEventTime: '08:00',
     issues: [],
-    notes: null,
+    stageBreakdown: [
+      { stage: 'DRAFTING', progress: 0, isStalled: false },
+      { stage: 'MACHINING', progress: 0, isStalled: false },
+    ],
   },
   {
-    id: 'item-002',
+    id: 'item-02',
     poId: 'po-001',
-    poNumber: 'PO-2026-001',
-    clientName: 'PT. Maju Jaya Teknik',
-    name: 'Poros Engkol Custom',
-    qty: 5,
-    progress: 60,
-    stage: 'PURCHASING',         // scenario: PURCHASING
-    productionType: 'machining',
-    vendorJob: false,
-    urgent: false,
-    allNG: false,
-    parentItemId: null,
-    parent: null,
-    invoiceStatus: 'UNPAID',
-    source: null,
-    returnBreadcrumb: null,
+    po: { number: 'PO-2026-001', clientName: 'PT. Maju Jaya', deliveryDate: '2026-05-30T00:00:00.000Z', urgent: true },
+    name: 'Shaft Presisi D20',
+    qty: 12, progress: 4, stage: 'MACHINING',
+    productionType: 'machining', vendorJob: false, urgent: true, allNG: false,
+    parentItemId: null, parent: null, source: null, returnBreadcrumb: null,
+    invoiceStatus: 'UNPAID', notes: null,
+    createdAt: '2026-04-01T08:00:00.000Z', updatedAt: '2026-04-03T14:20:00.000Z',
+    lastEventLabel: 'Progress diperbarui', lastEventTime: '14:20',
     issues: [],
-    notes: null,
+    stageBreakdown: [
+      { stage: 'DRAFTING', progress: 100, isStalled: false },
+      { stage: 'PURCHASING', progress: 100, isStalled: false },
+      { stage: 'MACHINING', progress: 4, isStalled: false },
+    ],
   },
   {
-    id: 'item-003',
-    poId: 'po-001',
-    poNumber: 'PO-2026-001',
-    clientName: 'PT. Maju Jaya Teknik',
-    name: 'Housing Gearbox A12',
-    qty: 5,
-    progress: 45,
-    stage: 'MACHINING',          // scenario: MACHINING, qty > 1
-    productionType: 'machining',
-    vendorJob: false,
-    urgent: false,
-    allNG: false,
-    parentItemId: null,
-    parent: null,
-    invoiceStatus: 'UNPAID',
-    source: null,
-    returnBreadcrumb: null,
-    issues: [{ resolved: false }], // scenario: unresolved issue
-    notes: null,
-  },
-  {
-    id: 'item-004',
-    poId: 'po-001',
-    poNumber: 'PO-2026-001',
-    clientName: 'PT. Maju Jaya Teknik',
-    name: 'Rangka Besi Konstruksi',
-    qty: 3,
-    progress: 80,
-    stage: 'FABRIKASI',          // scenario: FABRIKASI
-    productionType: 'fabrication',
-    vendorJob: false,
-    urgent: false,
-    allNG: false,
-    parentItemId: null,
-    parent: null,
-    invoiceStatus: 'UNPAID',
-    source: null,
-    returnBreadcrumb: null,
-    issues: [],
-    notes: null,
-  },
-  {
-    id: 'item-005',
-    poId: 'po-001',
-    poNumber: 'PO-2026-001',
-    clientName: 'PT. Maju Jaya Teknik',
-    name: 'Plat Cover Mesin',
-    qty: 10,
-    progress: 0,
-    stage: 'QC',                 // scenario: QC
-    productionType: 'both',
-    vendorJob: false,
-    urgent: false,
-    allNG: false,
-    parentItemId: null,
-    parent: null,
-    invoiceStatus: 'UNPAID',
-    source: null,
-    returnBreadcrumb: null,
-    issues: [],
-    notes: null,
-  },
-  {
-    id: 'item-006',
-    poId: 'po-001',
-    poNumber: 'PO-2026-001',
-    clientName: 'PT. Maju Jaya Teknik',
-    name: 'Flange Pipa DN100',
-    qty: 8,
-    progress: 37,
-    stage: 'DELIVERY',           // scenario: DELIVERY, qty > 1 (qty=8, progress=37)
-    productionType: 'machining',
-    vendorJob: false,
-    urgent: false,
-    allNG: false,
-    parentItemId: null,
-    parent: null,
-    invoiceStatus: 'UNPAID',
-    source: null,
-    returnBreadcrumb: null,
-    issues: [],
-    notes: null,
-  },
-  {
-    id: 'item-007',
-    poId: 'po-001',
-    poNumber: 'PO-2026-001',
-    clientName: 'PT. Maju Jaya Teknik',
-    name: 'Sproket Rantai T48',
-    qty: 4,
-    progress: 100,
-    stage: 'DONE',               // scenario: DONE
-    productionType: 'machining',
-    vendorJob: false,
-    urgent: false,
-    allNG: false,
-    parentItemId: null,
-    parent: null,
-    invoiceStatus: 'PAID',       // scenario: invoiceStatus PAID
-    source: null,
-    returnBreadcrumb: null,
-    issues: [],
-    notes: null,
-  },
-  // ── PO-2026-002 items (urgent: true inherited) ───────────────────────────
-  {
-    id: 'item-008',
+    id: 'item-03',
     poId: 'po-002',
-    poNumber: 'PO-2026-002',
-    clientName: 'CV. Karya Mandiri',
-    name: 'Silinder Hidrolik 50mm',
-    qty: 2,
-    progress: 55,
-    stage: 'MACHINING',
-    productionType: 'machining',
-    vendorJob: false,
-    urgent: true,                // scenario: urgent item (from PO-2026-002)
-    allNG: false,
-    parentItemId: null,
-    parent: null,
-    invoiceStatus: 'UNPAID',
-    source: null,
-    returnBreadcrumb: null,
+    po: { number: 'PO-2026-002', clientName: 'CV. Karya Bersama', deliveryDate: '2026-03-15T00:00:00.000Z', urgent: false },
+    name: 'Plat Cover 3mm',
+    qty: 8, progress: 3, stage: 'FABRIKASI',
+    productionType: 'fabrication', vendorJob: false, urgent: false, allNG: false,
+    parentItemId: null, parent: null, source: null, returnBreadcrumb: null,
+    invoiceStatus: 'UNPAID', notes: null,
+    createdAt: '2026-03-01T08:00:00.000Z', updatedAt: '2026-04-03T09:15:00.000Z',
+    lastEventLabel: 'Masalah dilaporkan', lastEventTime: '09:15',
+    issues: [{ id: 'iss-01', reason: 'Material salah ketebalan', resolved: false, filedById: 'user-fabrikasi-01' }],
+    stageBreakdown: [
+      { stage: 'DRAFTING', progress: 100, isStalled: false },
+      { stage: 'FABRIKASI', progress: 3, isStalled: true },
+    ],
+  },
+  {
+    id: 'item-04',
+    poId: 'po-002',
+    po: { number: 'PO-2026-002', clientName: 'CV. Karya Bersama', deliveryDate: '2026-03-15T00:00:00.000Z', urgent: false },
+    name: 'Bushing Set M12',
+    qty: 5, progress: 5, stage: 'QC',
+    productionType: 'machining', vendorJob: false, urgent: false, allNG: false,
+    parentItemId: null, parent: null, source: null, returnBreadcrumb: null,
+    invoiceStatus: 'UNPAID', notes: null,
+    createdAt: '2026-03-01T08:00:00.000Z', updatedAt: '2026-04-03T11:00:00.000Z',
+    lastEventLabel: 'Progress diperbarui', lastEventTime: '11:00',
     issues: [],
-    notes: null,
+    stageBreakdown: [
+      { stage: 'DRAFTING', progress: 100, isStalled: false },
+      { stage: 'PURCHASING', progress: 100, isStalled: false },
+      { stage: 'MACHINING', progress: 100, isStalled: false },
+      { stage: 'QC', progress: 5, isStalled: false },
+    ],
   },
   {
-    id: 'item-009',
+    id: 'item-05',
     poId: 'po-002',
-    poNumber: 'PO-2026-002',
-    clientName: 'CV. Karya Mandiri',
-    name: 'Bracket Siku - RW1',  // scenario: rework item
-    qty: 3,
-    progress: 0,
-    stage: 'QC',
-    productionType: 'machining',
-    vendorJob: false,
-    urgent: true,
-    allNG: false,
-    parentItemId: 'item-010',    // references the original item below
-    parent: { name: 'Bracket Siku' },
-    invoiceStatus: 'UNPAID',
-    source: null,
-    returnBreadcrumb: null,
-    issues: [{ resolved: false }],
-    notes: null,
+    po: { number: 'PO-2026-002', clientName: 'CV. Karya Bersama', deliveryDate: '2026-03-15T00:00:00.000Z', urgent: false },
+    name: 'Bushing Set M12 - RW1',
+    qty: 2, progress: 0, stage: 'QC',
+    productionType: 'machining', vendorJob: false, urgent: false, allNG: false,
+    parentItemId: 'item-04', parent: { name: 'Bushing Set M12' }, source: null, returnBreadcrumb: null,
+    invoiceStatus: 'UNPAID', notes: null,
+    createdAt: '2026-04-02T13:00:00.000Z', updatedAt: '2026-04-02T13:00:00.000Z',
+    lastEventLabel: 'Item rework dibuat', lastEventTime: '13:00',
+    issues: [{ id: 'iss-02', reason: 'Dimensi tidak sesuai', resolved: false, filedById: 'user-qc-01' }],
+    stageBreakdown: [
+      { stage: 'QC', progress: 0, isStalled: false },
+    ],
   },
   {
-    id: 'item-010',
+    id: 'item-06',
     poId: 'po-002',
-    poNumber: 'PO-2026-002',
-    clientName: 'CV. Karya Mandiri',
-    name: 'Bracket Siku',        // parent of the RW1 item above
-    qty: 7,
-    progress: 0,
-    stage: 'DELIVERY',
-    productionType: 'machining',
-    vendorJob: false,
-    urgent: true,
-    allNG: false,
-    parentItemId: null,
-    parent: null,
-    invoiceStatus: 'UNPAID',
-    source: null,
-    returnBreadcrumb: null,
+    po: { number: 'PO-2026-002', clientName: 'CV. Karya Bersama', deliveryDate: '2026-03-15T00:00:00.000Z', urgent: false },
+    name: 'Rangka Meja Las',
+    qty: 1, progress: 100, stage: 'DELIVERY',
+    productionType: 'fabrication', vendorJob: false, urgent: false, allNG: false,
+    parentItemId: null, parent: null, source: null, returnBreadcrumb: null,
+    invoiceStatus: 'UNPAID', notes: null,
+    createdAt: '2026-03-01T08:00:00.000Z', updatedAt: '2026-04-03T16:00:00.000Z',
+    lastEventLabel: 'Siap kirim', lastEventTime: '16:00',
     issues: [],
-    notes: null,
+    stageBreakdown: [
+      { stage: 'DRAFTING', progress: 100, isStalled: false },
+      { stage: 'FABRIKASI', progress: 100, isStalled: false },
+      { stage: 'QC', progress: 100, isStalled: false },
+      { stage: 'DELIVERY', progress: 100, isStalled: false },
+    ],
   },
   {
-    id: 'item-011',
-    poId: 'po-002',
-    poNumber: 'PO-2026-002',
-    clientName: 'CV. Karya Mandiri',
-    name: 'Bushing Tembaga 30mm',  // scenario: allNG item
-    qty: 5,
-    progress: 0,
-    stage: 'QC',
-    productionType: 'machining',
-    vendorJob: false,
-    urgent: true,
-    allNG: true,                 // scenario: allNG
-    parentItemId: null,
-    parent: null,
-    invoiceStatus: 'UNPAID',
-    source: null,
-    returnBreadcrumb: null,
-    issues: [{ resolved: false }],
-    notes: 'Seluruh unit gagal QC — menunggu rework',
-  },
-  // ── PO-2026-003 items (LATE PO) ─────────────────────────────────────────
-  {
-    id: 'item-012',
+    id: 'item-07',
     poId: 'po-003',
-    poNumber: 'PO-2026-003',
-    clientName: 'PT. Nusantara Industri',
-    name: 'Valve Gate 2 inch',   // scenario: vendor job
-    qty: 6,
-    progress: 70,
-    stage: 'PURCHASING',
-    productionType: 'machining',
-    vendorJob: true,             // scenario: vendorJob
-    urgent: false,
-    allNG: false,
-    parentItemId: null,
-    parent: null,
-    invoiceStatus: 'UNPAID',
-    source: null,
-    returnBreadcrumb: null,
+    po: { number: 'PO-2026-003', clientName: 'PT. Sinar Teknik', deliveryDate: '2026-06-15T00:00:00.000Z', urgent: false },
+    name: 'Flange DN50',
+    qty: 4, progress: 0, stage: 'PURCHASING',
+    productionType: 'both', vendorJob: false, urgent: false, allNG: false,
+    parentItemId: null, parent: null, source: null, returnBreadcrumb: null,
+    invoiceStatus: 'UNPAID', notes: null,
+    createdAt: '2026-04-02T09:00:00.000Z', updatedAt: '2026-04-02T09:00:00.000Z',
+    lastEventLabel: 'Item dibuat', lastEventTime: '09:00',
     issues: [],
-    notes: 'Item dikerjakan oleh vendor eksternal',
+    stageBreakdown: [
+      { stage: 'DRAFTING', progress: 100, isStalled: false },
+      { stage: 'PURCHASING', progress: 0, isStalled: false },
+      { stage: 'MACHINING', progress: 0, isStalled: false },
+      { stage: 'FABRIKASI', progress: 0, isStalled: false },
+      { stage: 'QC', progress: 0, isStalled: false },
+      { stage: 'DELIVERY', progress: 0, isStalled: false },
+    ],
   },
   {
-    id: 'item-013',
+    id: 'item-08',
     poId: 'po-003',
-    poNumber: 'PO-2026-003',
-    clientName: 'PT. Nusantara Industri',
-    name: 'Shaft Coupling 45mm', // scenario: return item
-    qty: 4,
-    progress: 0,
-    stage: 'QC',                 // regressed back to QC after return
-    productionType: 'machining',
-    vendorJob: false,
-    urgent: false,
-    allNG: false,
-    parentItemId: null,
-    parent: null,
-    invoiceStatus: 'UNPAID',
-    source: 'RETURN',            // scenario: return item
-    returnBreadcrumb: 'RETURN dari PO-2026-001', // scenario: returnBreadcrumb
+    po: { number: 'PO-2026-003', clientName: 'PT. Sinar Teknik', deliveryDate: '2026-06-15T00:00:00.000Z', urgent: false },
+    name: 'Pin Silinder Vendor',
+    qty: 10, progress: 0, stage: 'QC',
+    productionType: 'machining', vendorJob: true, urgent: false, allNG: false,
+    parentItemId: null, parent: null, source: null, returnBreadcrumb: null,
+    invoiceStatus: 'UNPAID', notes: 'Item dikerjakan vendor eksternal',
+    createdAt: '2026-04-02T09:00:00.000Z', updatedAt: '2026-04-02T09:00:00.000Z',
+    lastEventLabel: 'Diterima dari vendor', lastEventTime: '09:00',
     issues: [],
-    notes: null,
+    stageBreakdown: [
+      { stage: 'QC', progress: 0, isStalled: false },
+    ],
   },
   {
-    id: 'item-014',
-    poId: 'po-003',
-    poNumber: 'PO-2026-003',
-    clientName: 'PT. Nusantara Industri',
-    name: 'Plate Sambungan Las',
-    qty: 12,
-    progress: 20,
-    stage: 'FABRIKASI',
-    productionType: 'fabrication',
-    vendorJob: false,
-    urgent: false,
-    allNG: false,
-    parentItemId: null,
-    parent: null,
-    invoiceStatus: 'UNPAID',
-    source: null,
-    returnBreadcrumb: null,
+    id: 'item-09',
+    poId: 'po-002',
+    po: { number: 'PO-2026-002', clientName: 'CV. Karya Bersama', deliveryDate: '2026-03-15T00:00:00.000Z', urgent: false },
+    name: 'Plat Cover 3mm RETURN',
+    qty: 3, progress: 0, stage: 'QC',
+    productionType: 'fabrication', vendorJob: false, urgent: false, allNG: false,
+    parentItemId: null, parent: null, source: 'RETURN', returnBreadcrumb: 'PO-2026-002',
+    invoiceStatus: 'UNPAID', notes: null,
+    createdAt: '2026-04-03T10:00:00.000Z', updatedAt: '2026-04-03T10:00:00.000Z',
+    lastEventLabel: 'Return diterima', lastEventTime: '10:00',
     issues: [],
-    notes: null,
+    stageBreakdown: [
+      { stage: 'QC', progress: 0, isStalled: false },
+    ],
+  },
+  {
+    id: 'item-10',
+    poId: 'po-001',
+    po: { number: 'PO-2026-001', clientName: 'PT. Maju Jaya', deliveryDate: '2026-05-30T00:00:00.000Z', urgent: true },
+    name: 'Housing Pump A',
+    qty: 6, progress: 6, stage: 'DELIVERY',
+    productionType: 'machining', vendorJob: false, urgent: true, allNG: false,
+    parentItemId: null, parent: null, source: null, returnBreadcrumb: null,
+    invoiceStatus: 'UNPAID', notes: null,
+    createdAt: '2026-04-01T08:00:00.000Z', updatedAt: '2026-04-04T08:00:00.000Z',
+    lastEventLabel: 'Progress diperbarui', lastEventTime: '08:00',
+    issues: [],
+    stageBreakdown: [
+      { stage: 'DRAFTING', progress: 100, isStalled: false },
+      { stage: 'PURCHASING', progress: 100, isStalled: false },
+      { stage: 'MACHINING', progress: 100, isStalled: false },
+      { stage: 'QC', progress: 100, isStalled: false },
+      { stage: 'DELIVERY', progress: 6, isStalled: false },
+    ],
+  },
+  {
+    id: 'item-11',
+    poId: 'po-003',
+    po: { number: 'PO-2026-003', clientName: 'PT. Sinar Teknik', deliveryDate: '2026-06-15T00:00:00.000Z', urgent: false },
+    name: 'Cover Plate NG',
+    qty: 5, progress: 0, stage: 'QC',
+    productionType: 'fabrication', vendorJob: false, urgent: false, allNG: true,
+    parentItemId: null, parent: null, source: null, returnBreadcrumb: null,
+    invoiceStatus: 'UNPAID', notes: null,
+    createdAt: '2026-04-02T09:00:00.000Z', updatedAt: '2026-04-03T15:00:00.000Z',
+    lastEventLabel: 'Semua unit gagal QC', lastEventTime: '15:00',
+    issues: [{ id: 'iss-03', reason: 'Semua unit gagal QC', resolved: false, filedById: 'user-qc-01' }],
+    stageBreakdown: [
+      { stage: 'FABRIKASI', progress: 100, isStalled: false },
+      { stage: 'QC', progress: 0, isStalled: true },
+    ],
+  },
+  {
+    id: 'item-12',
+    poId: 'po-003',
+    po: { number: 'PO-2026-003', clientName: 'PT. Sinar Teknik', deliveryDate: '2026-06-15T00:00:00.000Z', urgent: false },
+    name: 'Cover Plate NG - RW1',
+    qty: 5, progress: 0, stage: 'QC',
+    productionType: 'fabrication', vendorJob: false, urgent: false, allNG: false,
+    parentItemId: 'item-11', parent: { name: 'Cover Plate NG' }, source: null, returnBreadcrumb: null,
+    invoiceStatus: 'UNPAID', notes: null,
+    createdAt: '2026-04-03T15:30:00.000Z', updatedAt: '2026-04-03T15:30:00.000Z',
+    lastEventLabel: 'Item rework dibuat', lastEventTime: '15:30',
+    issues: [{ id: 'iss-04', reason: 'Semua unit gagal QC', resolved: false, filedById: 'user-qc-01' }],
+    stageBreakdown: [
+      { stage: 'QC', progress: 0, isStalled: false },
+    ],
+  },
+  {
+    id: 'item-13',
+    poId: 'po-001',
+    po: { number: 'PO-2026-001', clientName: 'PT. Maju Jaya', deliveryDate: '2026-05-30T00:00:00.000Z', urgent: false },
+    name: 'Gear Box Cover',
+    qty: 1, progress: 0, stage: 'DRAFTING',
+    productionType: 'both', vendorJob: false, urgent: false, allNG: false,
+    parentItemId: null, parent: null, source: null, returnBreadcrumb: null,
+    invoiceStatus: 'UNPAID', notes: null,
+    createdAt: '2026-04-01T08:00:00.000Z', updatedAt: '2026-04-01T08:00:00.000Z',
+    lastEventLabel: 'Item dibuat', lastEventTime: '08:00',
+    issues: [],
+    stageBreakdown: [
+      { stage: 'DRAFTING', progress: 0, isStalled: false },
+      { stage: 'PURCHASING', progress: 0, isStalled: false },
+      { stage: 'MACHINING', progress: 0, isStalled: false },
+      { stage: 'FABRIKASI', progress: 0, isStalled: false },
+      { stage: 'QC', progress: 0, isStalled: false },
+      { stage: 'DELIVERY', progress: 0, isStalled: false },
+    ],
+  },
+  {
+    id: 'item-14',
+    poId: 'po-002',
+    po: { number: 'PO-2026-002', clientName: 'CV. Karya Bersama', deliveryDate: '2026-03-15T00:00:00.000Z', urgent: false },
+    name: 'Bracket Mounting B',
+    qty: 3, progress: 0, stage: 'DONE',
+    productionType: 'machining', vendorJob: false, urgent: false, allNG: false,
+    parentItemId: null, parent: null, source: null, returnBreadcrumb: null,
+    invoiceStatus: 'UNPAID', notes: null,
+    createdAt: '2026-03-01T08:00:00.000Z', updatedAt: '2026-04-02T17:00:00.000Z',
+    lastEventLabel: 'Selesai', lastEventTime: '17:00',
+    issues: [],
+    stageBreakdown: [
+      { stage: 'DRAFTING', progress: 100, isStalled: false },
+      { stage: 'PURCHASING', progress: 100, isStalled: false },
+      { stage: 'MACHINING', progress: 100, isStalled: false },
+      { stage: 'QC', progress: 100, isStalled: false },
+      { stage: 'DELIVERY', progress: 100, isStalled: false },
+    ],
   },
 ];
 
-// ─── Export 5: mockSession ───────────────────────────────────────────────────
-// Default session — Machining worker (Ahmad Fauzi) for UI simulation
+// ─── Audit log arrays (start empty) ──────────────────────────────────────────
+
+export let mockReturnItems: Record<string, unknown>[] = [];
+export let mockItemTracks: Record<string, unknown>[] = [];
+
+// ─── mockSession (default for UI simulation) ──────────────────────────────────
 
 export const mockSession: MockSession = {
-  userId:     'user-ahmad',
-  name:       'Ahmad Fauzi',
+  userId: 'user-machining-01',
+  name: 'Ahmad Fauzi',
   department: 'Machining',
-  role:       'worker',
+  role: 'worker',
   isLoggedIn: true,
 };
