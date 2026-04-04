@@ -3,7 +3,7 @@
 import React from 'react';
 
 interface StickyHeaderProps {
-  title: string;
+  title: React.ReactNode;
   leftSlot?: React.ReactNode;
   rightSlot?: React.ReactNode;
 }
