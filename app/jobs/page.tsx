@@ -2,7 +2,7 @@
 export const dynamic = 'force-dynamic';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { LogOut, Search, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import { mockItems, type MockItem } from '@/lib/mockData';
 import useUIStore from '@/store/uiStore';
 import { StickyHeader } from '@/components/layout/StickyHeader';
@@ -15,7 +15,7 @@ import ProgressSlider from '@/components/ui/ProgressSlider';
 import StepperControl from '@/components/ui/StepperControl';
 import BatalkanControl from '@/components/ui/BatalkanControl';
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function formatMonth(ym: string): string {
   const [y, m] = ym.split('-');
@@ -42,7 +42,7 @@ function overallProgress(item: MockItem): number {
   return maxTotal === 0 ? 0 : Math.round((total / maxTotal) * 100);
 }
 
-// ─── WorkerItemSummaryCard ────────────────────────────────────────────────────
+// ─── WorkerItemSummaryCard ─────────────────────────────────────────────────────
 
 function WorkerItemSummaryCard({
   item,
@@ -68,19 +68,15 @@ function WorkerItemSummaryCard({
     const isComplete =
       (item.qty === 1 && localProgress === 100) ||
       (item.qty > 1 && localProgress === item.qty);
-
     if (startTimerRef.current) startTimerRef.current(previous);
     onSave(item.id, localProgress, previous);
-
     if (isComplete) {
       const sheet = item.stage === 'QC' ? 'qc-gate' : 'delivery-gate';
       openBottomSheet(sheet, item.id);
     }
   }
 
-  function handleUndo() {
-    setLocalProgress(item.progress);
-  }
+  function handleUndo() { setLocalProgress(item.progress); }
 
   const isPastDue = new Date(item.po.deliveryDate) < new Date();
   const dueDateStr = new Date(item.po.deliveryDate).toLocaleDateString('id-ID', {
@@ -165,34 +161,31 @@ function WorkerItemSummaryCard({
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function JobsPage() {
-  const hasHydrated = useUIStore((s) => s._hasHydrated);
-  const session = useUIStore((s) => s.session);
+  const hasHydrated    = useUIStore((s) => s._hasHydrated);
+  const session        = useUIStore((s) => s.session);
   const expandedItemId = useUIStore((s) => s.expandedItemId);
   const setExpandedItemId = useUIStore((s) => s.setExpandedItemId);
-  const selectedSegment = useUIStore((s) => s.selectedSegment);
+  const selectedSegment   = useUIStore((s) => s.selectedSegment);
   const setSelectedSegment = useUIStore((s) => s.setSelectedSegment);
-  const selectedMonth = useUIStore((s) => s.selectedMonth);
-  const setSelectedMonth = useUIStore((s) => s.setSelectedMonth);
-  const searchQuery = useUIStore((s) => s.searchQuery);
-  const setSearchQuery = useUIStore((s) => s.setSearchQuery);
+  const selectedMonth     = useUIStore((s) => s.selectedMonth);
+  const setSelectedMonth  = useUIStore((s) => s.setSelectedMonth);
+  const searchQuery       = useUIStore((s) => s.searchQuery);
+  const setSearchQuery    = useUIStore((s) => s.setSearchQuery);
 
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [debouncedSearch, setDebouncedSearch] = useState(searchQuery);
 
-  // Semua useCallback HARUS di sini — sebelum early return apapun
+  // Semua hooks sebelum early return
   const handleToggle = useCallback((id: string) => {
     setExpandedItemId(expandedItemId === id ? null : id);
   }, [expandedItemId, setExpandedItemId]);
 
   const handleSave = useCallback((
-    itemId: string,
-    newProgress: number,
-    previousProgress: number,
+    itemId: string, newProgress: number, previousProgress: number,
   ) => {
     console.log('[mock] save', itemId, newProgress, previousProgress);
   }, []);
 
-  // Guard: tunggu hydration dulu
   useEffect(() => {
     if (!hasHydrated) return;
     if (!session || !session.isLoggedIn) {
@@ -210,7 +203,6 @@ export default function JobsPage() {
     searchTimerRef.current = setTimeout(() => setDebouncedSearch(val), 300);
   }
 
-  // Spinner selama hydration atau session belum valid
   if (!hasHydrated || !session || !session.isLoggedIn) {
     return (
       <div className="min-h-screen bg-[#F8F9FA] flex items-center justify-center">
@@ -219,13 +211,18 @@ export default function JobsPage() {
     );
   }
 
-  const dept = session.department;
+  const dept = session.department.toUpperCase(); // fix case-mismatch dengan mockData
 
+  // Filter: tampilkan item bulan ini ATAU semua bulan (month filter hanya informatif)
+  // mockData items punya createdAt 2026-04-xx → cocok dengan selectedMonth 2026-04
   const filtered = mockItems.filter((item) => {
     if (item.stage !== dept) return false;
     if (selectedSegment === 'active' && item.allNG) return false;
     if (selectedSegment === 'archive' && !item.allNG && item.stage !== 'DONE') return false;
-    const inMonth = item.createdAt.startsWith(selectedMonth) || item.updatedAt.startsWith(selectedMonth);
+    // Month filter — cek tahun-bulan dari createdAt atau updatedAt
+    const itemMonth = (d: string) => d.slice(0, 7); // "2026-04"
+    const inMonth = itemMonth(item.createdAt) === selectedMonth ||
+                    itemMonth(item.updatedAt) === selectedMonth;
     if (!inMonth) return false;
     if (debouncedSearch) {
       const q = debouncedSearch.toLowerCase();
@@ -246,7 +243,7 @@ export default function JobsPage() {
     return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
   });
 
-  const activeCount = mockItems.filter((i) => i.stage === dept && !i.allNG).length;
+  const activeCount  = mockItems.filter((i) => i.stage === dept && !i.allNG).length;
   const archiveCount = mockItems.filter((i) => i.stage === dept && (i.allNG || i.stage === 'DONE')).length;
 
   return (
@@ -254,19 +251,14 @@ export default function JobsPage() {
       <div className="sticky top-0 z-30 bg-[#F8F9FA]">
         <StickyHeader
           title="Tugas Saya"
-          leftSlot={<ProfileAvatar name={session.name} />}
-          rightSlot={
-            <div className="flex items-center gap-2">
-              <NotificationBell />
-              <button
-                type="button"
-                onClick={() => { window.location.href = '/select-dept'; }}
-                aria-label="Keluar"
-              >
-                <LogOut size={20} color="#6B7280" />
-              </button>
-            </div>
+          leftSlot={
+            <ProfileAvatar
+              name={session.name}
+              department={session.department}
+              role={session.role}
+            />
           }
+          rightSlot={<NotificationBell />}
         />
         <div className="mx-4 mt-2">
           <div className="flex items-center gap-2 h-12 bg-white border border-[#E5E7EB] rounded-xl px-4">
@@ -332,7 +324,7 @@ export default function JobsPage() {
               <rect x="16" y="32" width="32" height="4" rx="2" fill="#9CA3AF" />
               <rect x="16" y="40" width="24" height="4" rx="2" fill="#9CA3AF" />
             </svg>
-            <p className="text-sm text-[#6B7280] text-center">Tidak ada pekerjaan aktif bulan ini</p>
+            <p className="text-sm text-[#6B7280] text-center">Tidak ada pekerjaan bulan ini</p>
           </div>
         ) : (
           sorted.map((item) => (

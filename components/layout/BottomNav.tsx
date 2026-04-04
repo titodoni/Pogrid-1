@@ -28,26 +28,28 @@ interface Tab {
 
 function getTabsForRole(role: string, department: string): Tab[] {
   if (role === 'worker') {
-    const hasIssuesTab = ['Machining', 'Fabrikasi', 'QC', 'Delivery'].includes(department);
-    const base: Tab[] = [
-      { label: 'My Jobs', route: '/jobs',  icon: Briefcase },
-      { label: 'Board',   route: '/board', icon: LayoutGrid },
+    // Worker: My Jobs + Issues (hanya dept produksi). Board TIDAK ada.
+    const hasIssuesTab = ['MACHINING', 'FABRIKASI', 'QC', 'DELIVERY'].includes(
+      department.toUpperCase()
+    );
+    const tabs: Tab[] = [
+      { label: 'My Jobs', route: '/jobs', icon: Briefcase },
     ];
     if (hasIssuesTab) {
-      base.push({ label: 'Issues', route: '/issues', icon: AlertTriangle });
+      tabs.push({ label: 'Issues', route: '/issues', icon: AlertTriangle });
     }
-    return base;
+    return tabs;
   }
 
   switch (role) {
     case 'admin':
       return [
-        { label: 'Board',       route: '/board',       icon: LayoutGrid },
-        { label: 'POs',         route: '/pos',         icon: ClipboardList },
-        { label: 'Issues',      route: '/issues',      icon: AlertTriangle },
-        { label: 'Users',       route: '/users',       icon: Users },
-        { label: 'Departments', route: '/departments', icon: Building2 },
-        { label: 'Settings',    route: '/settings',    icon: Settings },
+        { label: 'Board',    route: '/board',       icon: LayoutGrid },
+        { label: 'POs',      route: '/pos',         icon: ClipboardList },
+        { label: 'Issues',   route: '/issues',      icon: AlertTriangle },
+        { label: 'Users',    route: '/users',       icon: Users },
+        { label: 'Dept',     route: '/departments', icon: Building2 },
+        { label: 'Settings', route: '/settings',    icon: Settings },
       ];
     case 'manager':
       return [
@@ -70,9 +72,7 @@ function getTabsForRole(role: string, department: string): Tab[] {
         { label: 'POs',       route: '/pos',       icon: ClipboardList },
       ];
     default:
-      return [
-        { label: 'Board', route: '/board', icon: LayoutGrid },
-      ];
+      return [{ label: 'Board', route: '/board', icon: LayoutGrid }];
   }
 }
 
@@ -91,19 +91,18 @@ export function BottomNav({ role, department }: BottomNavProps) {
         {tabs.map((tab) => {
           const Icon = tab.icon;
           const isActive = currentPath === tab.route;
-          const colorClass = isActive ? 'text-brand' : 'text-[#9CA3AF]';
-
+          const colorClass = isActive ? 'text-[#2A7B76]' : 'text-[#9CA3AF]';
           return (
             <button
               key={tab.route}
               type="button"
-              onClick={() => {}}
+              onClick={() => { window.location.href = tab.route; }}
               className={`flex-1 flex flex-col items-center justify-center gap-0.5 h-full min-h-[48px] ${colorClass}`}
               aria-label={tab.label}
               aria-current={isActive ? 'page' : undefined}
             >
-              <Icon size={24} className={colorClass} />
-              <span className={`text-xs font-medium ${colorClass}`}>{tab.label}</span>
+              <Icon size={24} />
+              <span className="text-xs font-medium">{tab.label}</span>
             </button>
           );
         })}
