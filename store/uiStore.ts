@@ -28,7 +28,7 @@ export interface UIStore {
   setPendingProgress(
     itemId: string,
     previous: number,
-    timeoutRef: ReturnType<typeof setTimeout>,
+    timeoutRef: ReturnType<typeof setTimeout> | null,
   ): void;
   clearPendingProgress(itemId: string): void;
   setUndoFailed(itemId: string, failed: boolean): void;

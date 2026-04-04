@@ -59,10 +59,9 @@ function WorkerItemSummaryCard({
 }) {
   const openBottomSheet = useUIStore((s) => s.openBottomSheet);
   const [localProgress, setLocalProgress] = useState(item.progress);
+  const startTimerRef = useRef<((prev: number) => void) | null>(null);
 
   useEffect(() => { setLocalProgress(item.progress); }, [item.progress]);
-
-  let startTimerFn: ((prev: number) => void) | null = null;
 
   function handleSave() {
     const previous = item.progress;
@@ -70,10 +69,7 @@ function WorkerItemSummaryCard({
       (item.qty === 1 && localProgress === 100) ||
       (item.qty > 1 && localProgress === item.qty);
 
-    item.progress = localProgress;
-    item.updatedAt = new Date().toISOString();
-
-    if (startTimerFn) startTimerFn(previous);
+    if (startTimerRef.current) startTimerRef.current(previous);
     onSave(item.id, localProgress, previous);
 
     if (isComplete) {
@@ -142,7 +138,7 @@ function WorkerItemSummaryCard({
               <BatalkanControl
                 itemId={item.id}
                 onUndo={handleUndo}
-                onStartTimer={(fn) => { startTimerFn = fn; }}
+                onStartTimer={(fn) => { startTimerRef.current = fn; }}
               />
               <button
                 type="button"

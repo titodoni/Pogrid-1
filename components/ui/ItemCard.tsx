@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { type MockItem } from '@/lib/mockData';
 import StageBadge from './StageBadge';
 import { VendorPill, RoutingPill, ReworkPill, ReturnPill } from './PillBadges';
@@ -26,15 +26,14 @@ export default function ItemCard({
   onSaveProgress,
   onOpenIssueSheet,
   onOpenGateSheet,
+  currentUserId: _currentUserId,
+  onProgressChange: _onProgressChange,
 }: ItemCardProps) {
-  // Only one useState allowed in this component — localProgress
   const [localProgress, setLocalProgress] = useState(item.progress);
+  const startTimerRef = useRef<((prev: number) => void) | null>(null);
 
   const isInteractive = isWorkerView && isOwnerStage && !item.allNG;
   const hasUnsaved = localProgress !== item.progress;
-
-  // Ref injection from BatalkanControl — lets parent trigger STATE 3
-  let startTimerFn: ((prev: number) => void) | null = null;
 
   function handleSave() {
     const previous = item.progress;
@@ -42,17 +41,10 @@ export default function ItemCard({
       (item.qty === 1 && localProgress === 100) ||
       (item.qty > 1 && localProgress === item.qty);
 
-    // Update in-memory mockItems
-    item.progress = localProgress;
-    item.updatedAt = new Date().toISOString();
-
-    // Trigger BatalkanControl STATE 3
-    if (startTimerFn) startTimerFn(previous);
-
+    if (startTimerRef.current) startTimerRef.current(previous);
     onSaveProgress(item.id, localProgress, previous);
 
     if (isComplete) {
-      // Phase 2 stub — gate sheet
       onOpenGateSheet(item.id);
     }
   }
@@ -97,7 +89,6 @@ export default function ItemCard({
           ? <ProgressSlider value={localProgress} onChange={setLocalProgress} />
           : <StepperControl current={localProgress} max={item.qty} onChange={setLocalProgress} />
       ) : (
-        // Read-only
         item.qty === 1 ? (
           <div className="flex items-center gap-3 opacity-70">
             <div className="flex-1 h-2 rounded-full bg-[#E5E7EB]">
@@ -123,7 +114,7 @@ export default function ItemCard({
             <BatalkanControl
               itemId={item.id}
               onUndo={handleUndo}
-              onStartTimer={(fn) => { startTimerFn = fn; }}
+              onStartTimer={(fn) => { startTimerRef.current = fn; }}
             />
             <div className="flex items-center gap-2">
               {hasUnsaved && (
