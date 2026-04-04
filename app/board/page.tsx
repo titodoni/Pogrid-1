@@ -57,9 +57,9 @@ export default function BoardPage() {
     <div className="min-h-screen bg-[#F8F9FA]">
       <div className="sticky top-0 z-30 bg-[#F8F9FA]">
         <StickyHeader
-          left={<ProfileAvatar name={session.name} />}
-          center={<span className="text-xl font-bold text-[#1A1A2E]">Board</span>}
-          right={<NotificationBell />}
+          title="Board"
+          leftSlot={<ProfileAvatar name={session.name} />}
+          rightSlot={<NotificationBell />}
         />
         <div className="px-4 py-2">
           <div className="flex gap-2 overflow-x-auto scrollbar-hide">

@@ -241,9 +241,9 @@ export default function JobsPage() {
     <div className="min-h-screen bg-[#F8F9FA]">
       <div className="sticky top-0 z-30 bg-[#F8F9FA]">
         <StickyHeader
-          left={<ProfileAvatar name={session.name} />}
-          center={<span className="text-xl font-bold text-[#1A1A2E]">Tugas Saya</span>}
-          right={
+          title="Tugas Saya"
+          leftSlot={<ProfileAvatar name={session.name} />}
+          rightSlot={
             <div className="flex items-center gap-2">
               <NotificationBell />
               <button
