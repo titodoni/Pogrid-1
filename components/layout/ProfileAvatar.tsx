@@ -6,8 +6,6 @@ import useUIStore from '@/store/uiStore';
 
 interface ProfileAvatarProps {
   name: string;
-  department?: string;
-  role?: string;
 }
 
 function getInitials(name: string): string {
@@ -62,7 +60,6 @@ function ProfileDrawer({ onClose }: { onClose: () => void }) {
   const [pinError, setPinError] = useState('');
   const [pinSuccess, setPinSuccess] = useState(false);
 
-  // mock PIN — semua user default '1234', admin '0000'
   const MOCK_PIN = session?.role === 'admin' ? '0000' : '1234';
 
   function handleOldDone() {
@@ -106,7 +103,6 @@ function ProfileDrawer({ onClose }: { onClose: () => void }) {
     <>
       <div className="fixed inset-0 bg-black/40 z-40" onClick={onClose} aria-hidden="true" />
       <div className="fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-2xl shadow-xl animate-slide-up max-h-[85vh] flex flex-col">
-        {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-[#E5E7EB] flex-shrink-0">
           <span className="text-base font-semibold text-[#1A1A2E]">Profil</span>
           <button type="button" onClick={onClose} className="flex items-center justify-center min-w-[48px] min-h-[48px] text-[#6B7280]" aria-label="Tutup">
@@ -115,7 +111,6 @@ function ProfileDrawer({ onClose }: { onClose: () => void }) {
         </div>
 
         <div className="overflow-y-auto flex-1 px-4 py-5">
-          {/* Avatar + info */}
           <div className="flex flex-col items-center gap-2 mb-6">
             <div className="w-16 h-16 rounded-full bg-[#2A7B76] flex items-center justify-center">
               <span className="text-white text-2xl font-bold select-none">{initials}</span>
@@ -124,7 +119,6 @@ function ProfileDrawer({ onClose }: { onClose: () => void }) {
             <p className="text-sm text-[#6B7280] capitalize">{session?.role} · {session?.department}</p>
           </div>
 
-          {/* Ganti PIN */}
           {pinStep === 'idle' && !pinSuccess && (
             <button
               type="button"
@@ -147,12 +141,7 @@ function ProfileDrawer({ onClose }: { onClose: () => void }) {
               <p className="text-sm font-semibold text-[#1A1A2E] mb-1">Masukkan PIN lama</p>
               {pinError && <p className="text-xs text-[#B33941] mb-1 animate-shake">{pinError}</p>}
               <PinPad value={pinOld} onChange={setPinOld} />
-              <button
-                type="button"
-                onClick={handleOldDone}
-                disabled={pinOld.length < 4}
-                className="mt-3 w-full h-12 rounded-xl bg-[#2A7B76] text-white text-sm font-medium disabled:opacity-40"
-              >Lanjut</button>
+              <button type="button" onClick={handleOldDone} disabled={pinOld.length < 4} className="mt-3 w-full h-12 rounded-xl bg-[#2A7B76] text-white text-sm font-medium disabled:opacity-40">Lanjut</button>
               <button type="button" onClick={resetPin} className="mt-2 w-full h-10 text-sm text-[#6B7280]">Batal</button>
             </div>
           )}
@@ -161,12 +150,7 @@ function ProfileDrawer({ onClose }: { onClose: () => void }) {
             <div className="animate-fade-in">
               <p className="text-sm font-semibold text-[#1A1A2E] mb-1">PIN baru</p>
               <PinPad value={pinNew} onChange={setPinNew} />
-              <button
-                type="button"
-                onClick={handleNewDone}
-                disabled={pinNew.length < 4}
-                className="mt-3 w-full h-12 rounded-xl bg-[#2A7B76] text-white text-sm font-medium disabled:opacity-40"
-              >Lanjut</button>
+              <button type="button" onClick={handleNewDone} disabled={pinNew.length < 4} className="mt-3 w-full h-12 rounded-xl bg-[#2A7B76] text-white text-sm font-medium disabled:opacity-40">Lanjut</button>
               <button type="button" onClick={resetPin} className="mt-2 w-full h-10 text-sm text-[#6B7280]">Batal</button>
             </div>
           )}
@@ -176,18 +160,12 @@ function ProfileDrawer({ onClose }: { onClose: () => void }) {
               <p className="text-sm font-semibold text-[#1A1A2E] mb-1">Konfirmasi PIN baru</p>
               {pinError && <p className="text-xs text-[#B33941] mb-1 animate-shake">{pinError}</p>}
               <PinPad value={pinConfirm} onChange={setPinConfirm} />
-              <button
-                type="button"
-                onClick={handleConfirmDone}
-                disabled={pinConfirm.length < 4}
-                className="mt-3 w-full h-12 rounded-xl bg-[#2A7B76] text-white text-sm font-medium disabled:opacity-40"
-              >Simpan PIN</button>
+              <button type="button" onClick={handleConfirmDone} disabled={pinConfirm.length < 4} className="mt-3 w-full h-12 rounded-xl bg-[#2A7B76] text-white text-sm font-medium disabled:opacity-40">Simpan PIN</button>
               <button type="button" onClick={resetPin} className="mt-2 w-full h-10 text-sm text-[#6B7280]">Batal</button>
             </div>
           )}
         </div>
 
-        {/* Keluar */}
         <div className="px-4 pb-6 pt-2 flex-shrink-0 border-t border-[#F3F4F6]">
           <button
             type="button"
@@ -203,7 +181,7 @@ function ProfileDrawer({ onClose }: { onClose: () => void }) {
   );
 }
 
-export function ProfileAvatar({ name, department, role }: ProfileAvatarProps) {
+export function ProfileAvatar({ name }: ProfileAvatarProps) {
   const [open, setOpen] = useState(false);
   return (
     <>
