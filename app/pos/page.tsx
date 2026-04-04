@@ -21,12 +21,10 @@ export default function POsPage() {
       role={session.role}
       department={session.department}
       headerTitle="Purchase Orders"
-      headerLeft={
-        <ProfileAvatar name={session.name} onClick={() => {}} />
-      }
+      headerLeft={<ProfileAvatar name={session.name} />}
     >
       <div className="flex items-center justify-center h-40">
-        <p className="text-lg font-semibold text-[#6B7280]">Purchase Orders — Phase 3</p>
+        <p className="text-lg font-semibold text-[#6B7280]">POs — Phase 2</p>
       </div>
     </LayoutWrapper>
   );
