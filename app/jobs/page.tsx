@@ -42,7 +42,7 @@ function overallProgress(item: MockItem): number {
   return maxTotal === 0 ? 0 : Math.round((total / maxTotal) * 100);
 }
 
-// ─── WorkerItemSummaryCard ───────────────────────────────────────────────────
+// ─── WorkerItemSummaryCard ────────────────────────────────────────────────────
 
 function WorkerItemSummaryCard({
   item,
@@ -165,6 +165,7 @@ function WorkerItemSummaryCard({
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function JobsPage() {
+  const hasHydrated = useUIStore((s) => s._hasHydrated);
   const session = useUIStore((s) => s.session);
   const expandedItemId = useUIStore((s) => s.expandedItemId);
   const setExpandedItemId = useUIStore((s) => s.setExpandedItemId);
@@ -178,10 +179,17 @@ export default function JobsPage() {
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [debouncedSearch, setDebouncedSearch] = useState(searchQuery);
 
+  // Guard: tunggu hydration selesai dulu sebelum cek session
   useEffect(() => {
-    if (!session) { window.location.href = '/select-dept'; return; }
-    if (session.role !== 'worker') { window.location.href = '/board'; }
-  }, [session]);
+    if (!hasHydrated) return;
+    if (!session || !session.isLoggedIn) {
+      window.location.href = '/select-dept';
+      return;
+    }
+    if (session.role !== 'worker') {
+      window.location.href = '/board';
+    }
+  }, [hasHydrated, session]);
 
   function handleSearchChange(val: string) {
     setSearchQuery(val);
@@ -189,7 +197,16 @@ export default function JobsPage() {
     searchTimerRef.current = setTimeout(() => setDebouncedSearch(val), 300);
   }
 
-  const dept = session?.department ?? '';
+  // Tampilkan loading splash selama hydration atau sebelum guard selesai
+  if (!hasHydrated || !session || !session.isLoggedIn) {
+    return (
+      <div className="min-h-screen bg-[#F8F9FA] flex items-center justify-center">
+        <div className="w-12 h-12 rounded-full border-4 border-[#2A7B76] border-t-transparent animate-spin" />
+      </div>
+    );
+  }
+
+  const dept = session.department;
 
   const filtered = mockItems.filter((item) => {
     if (item.stage !== dept) return false;
@@ -230,8 +247,6 @@ export default function JobsPage() {
   ) => {
     console.log('[mock] save', itemId, newProgress, previousProgress);
   }, []);
-
-  if (!session) return null;
 
   return (
     <div className="min-h-screen bg-[#F8F9FA]">

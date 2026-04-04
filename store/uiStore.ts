@@ -2,9 +2,13 @@ import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 import { persist, createJSONStorage } from 'zustand/middleware';
 
-// ─── Interface ───────────────────────────────────────────────────────────────────────────
+// ─── Interface ───────────────────────────────────────────────────────────────
 
 export interface UIStore {
+  // ── 0. Hydration flag ────────────────────────────────────────────────
+  _hasHydrated: boolean;
+  setHasHydrated(v: boolean): void;
+
   // ── 1. Session (mock auth) ───────────────────────────────────────────
   session: {
     userId: string;
@@ -16,7 +20,7 @@ export interface UIStore {
   setSession(session: UIStore['session']): void;
   clearSession(): void;
 
-  // ── 2. BatalkanControl (per-item, keyed by itemId) ──────────────────────
+  // ── 2. BatalkanControl (per-item, keyed by itemId) ───────────────────
   pendingProgress: Record<
     string,
     {
@@ -35,7 +39,7 @@ export interface UIStore {
   setUndoFailed(itemId: string, failed: boolean): void;
   incrementRetryCount(itemId: string): void;
 
-  // ── 3. Bottom Sheets ────────────────────────────────────────────────────
+  // ── 3. Bottom Sheets ─────────────────────────────────────────────────
   activeBottomSheet:
     | 'qc-gate'
     | 'delivery-gate'
@@ -48,27 +52,27 @@ export interface UIStore {
   openBottomSheet(sheet: UIStore['activeBottomSheet'], itemId: string): void;
   closeBottomSheet(): void;
 
-  // ── 4. Connection Status ───────────────────────────────────────────────
+  // ── 4. Connection Status ──────────────────────────────────────────────
   connectionStatus: 'online' | 'offline' | 'reconnecting';
   setConnectionStatus(status: UIStore['connectionStatus']): void;
 
-  // ── 5. Board Filters ───────────────────────────────────────────────────
+  // ── 5. Board Filters ──────────────────────────────────────────────────
   boardFilters: string[];
   setBoardFilters(filters: string[]): void;
   toggleBoardFilter(filter: string): void;
 
-  // ── 6. My Jobs Display (Phase 0 compat) ────────────────────────────────
+  // ── 6. My Jobs Display ────────────────────────────────────────────────
   showCompleted: boolean;
   toggleShowCompleted(): void;
   hariIniActive: boolean;
   toggleHariIni(): void;
 
-  // ── 7. Local Item Progress ───────────────────────────────────────────────
+  // ── 7. Local Item Progress ────────────────────────────────────────────
   localProgress: Record<string, number>;
   setLocalProgress(itemId: string, value: number): void;
   clearLocalProgress(itemId: string): void;
 
-  // ── 8. Select-Dept Screen State ──────────────────────────────────────────
+  // ── 8. Select-Dept Screen State ───────────────────────────────────────
   selectedDept: string | null;
   drawerOpen: boolean;
   forgotPinOpen: boolean;
@@ -76,7 +80,7 @@ export interface UIStore {
   setDrawerOpen(open: boolean): void;
   setForgotPinOpen(open: boolean): void;
 
-  // ── 9. Phase 1 — Floor State Machine ──────────────────────────────────────
+  // ── 9. Phase 1 — Floor State Machine ──────────────────────────────────
   expandedItemId: string | null;
   setExpandedItemId(id: string | null): void;
 
@@ -93,13 +97,19 @@ export interface UIStore {
   setNotificationCount(n: number): void;
 }
 
-// ─── Store ──────────────────────────────────────────────────────────────────────────────
+// ─── Store ───────────────────────────────────────────────────────────────────
 
 const useUIStore = create<UIStore>()(
   persist(
     immer((set) => ({
 
-      // ── 1. Session — vanilla set (bypass immer Proxy so persist serializes correctly)
+      // ── 0. Hydration flag ─────────────────────────────────────────────
+      _hasHydrated: false,
+      setHasHydrated(v) {
+        set(() => ({ _hasHydrated: v }));
+      },
+
+      // ── 1. Session — vanilla set (bypass immer Proxy) ─────────────────
       session: null,
       setSession(session) {
         set(() => ({ session }));
@@ -108,7 +118,7 @@ const useUIStore = create<UIStore>()(
         set(() => ({ session: null }));
       },
 
-      // ── 2. BatalkanControl ────────────────────────────────────────────────────
+      // ── 2. BatalkanControl ────────────────────────────────────────────
       pendingProgress: {},
       setPendingProgress(itemId, previous, timeoutRef) {
         set((draft) => {
@@ -129,7 +139,7 @@ const useUIStore = create<UIStore>()(
         });
       },
 
-      // ── 3. Bottom Sheets ────────────────────────────────────────────────────
+      // ── 3. Bottom Sheets ──────────────────────────────────────────────
       activeBottomSheet: null,
       bottomSheetItemId: null,
       openBottomSheet(sheet, itemId) {
@@ -139,13 +149,13 @@ const useUIStore = create<UIStore>()(
         set((draft) => { draft.activeBottomSheet = null; draft.bottomSheetItemId = null; });
       },
 
-      // ── 4. Connection Status ───────────────────────────────────────────────
+      // ── 4. Connection Status ──────────────────────────────────────────
       connectionStatus: 'online',
       setConnectionStatus(status) {
         set((draft) => { draft.connectionStatus = status; });
       },
 
-      // ── 5. Board Filters ───────────────────────────────────────────────────
+      // ── 5. Board Filters ──────────────────────────────────────────────
       boardFilters: [],
       setBoardFilters(filters) {
         set((draft) => { draft.boardFilters = filters; });
@@ -158,7 +168,7 @@ const useUIStore = create<UIStore>()(
         });
       },
 
-      // ── 6. My Jobs Display ───────────────────────────────────────────────────
+      // ── 6. My Jobs Display ────────────────────────────────────────────
       showCompleted: false,
       toggleShowCompleted() {
         set((draft) => { draft.showCompleted = !draft.showCompleted; });
@@ -168,7 +178,7 @@ const useUIStore = create<UIStore>()(
         set((draft) => { draft.hariIniActive = !draft.hariIniActive; });
       },
 
-      // ── 7. Local Item Progress ───────────────────────────────────────────────
+      // ── 7. Local Item Progress ────────────────────────────────────────
       localProgress: {},
       setLocalProgress(itemId, value) {
         set((draft) => { draft.localProgress[itemId] = value; });
@@ -177,7 +187,7 @@ const useUIStore = create<UIStore>()(
         set((draft) => { delete draft.localProgress[itemId]; });
       },
 
-      // ── 8. Select-Dept ─────────────────────────────────────────────────────────────
+      // ── 8. Select-Dept ────────────────────────────────────────────────
       selectedDept: null,
       drawerOpen: false,
       forgotPinOpen: false,
@@ -191,7 +201,7 @@ const useUIStore = create<UIStore>()(
         set((draft) => { draft.forgotPinOpen = open; });
       },
 
-      // ── 9. Phase 1 — Floor State Machine ──────────────────────────────────────
+      // ── 9. Phase 1 — Floor State Machine ──────────────────────────────
       expandedItemId: null,
       setExpandedItemId(id) {
         set((draft) => { draft.expandedItemId = id; });
@@ -221,8 +231,12 @@ const useUIStore = create<UIStore>()(
     {
       name: 'pogrid-session',
       storage: createJSONStorage(() => sessionStorage),
-      // Hanya persist field session — state UI lain tidak perlu survive reload
       partialize: (state) => ({ session: state.session }),
+      onRehydrateStorage: () => (state) => {
+        // Dipanggil setelah sessionStorage selesai di-load
+        // state bisa undefined kalau rehydration error
+        if (state) state.setHasHydrated(true);
+      },
     },
   )
 );
