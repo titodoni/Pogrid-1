@@ -99,13 +99,13 @@ const useUIStore = create<UIStore>()(
   persist(
     immer((set) => ({
 
-      // ── 1. Session ────────────────────────────────────────────────────────────
+      // ── 1. Session — vanilla set (bypass immer Proxy so persist serializes correctly)
       session: null,
       setSession(session) {
-        set((draft) => { draft.session = session; });
+        set(() => ({ session }));
       },
       clearSession() {
-        set((draft) => { draft.session = null; });
+        set(() => ({ session: null }));
       },
 
       // ── 2. BatalkanControl ────────────────────────────────────────────────────
