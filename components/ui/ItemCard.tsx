@@ -26,8 +26,6 @@ export default function ItemCard({
   onSaveProgress,
   onOpenIssueSheet,
   onOpenGateSheet,
-  currentUserId: _currentUserId,
-  onProgressChange: _onProgressChange,
 }: ItemCardProps) {
   const [localProgress, setLocalProgress] = useState(item.progress);
   const startTimerRef = useRef<((prev: number) => void) | null>(null);
