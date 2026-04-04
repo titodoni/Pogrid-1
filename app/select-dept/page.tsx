@@ -4,7 +4,7 @@ export const dynamic = 'force-dynamic';
 import React, { useState, useEffect } from 'react';
 import {
   Pencil, ShoppingCart, Settings, Flame, ShieldCheck,
-  Truck, Cog, BarChart2, Briefcase,
+  Truck, LayoutDashboard, Briefcase, Landmark,
   Phone, Mail, MessageCircle, X,
   type LucideIcon,
 } from 'lucide-react';
@@ -24,9 +24,9 @@ const DEPT_CARDS: { name: string; icon: LucideIcon }[] = [
   { name: 'Fabrikasi',  icon: Flame },
   { name: 'QC',         icon: ShieldCheck },
   { name: 'Delivery',   icon: Truck },
-  { name: 'Admin',      icon: Cog },
-  { name: 'Manager',    icon: BarChart2 },
+  { name: 'Admin & Manager', icon: LayoutDashboard },
   { name: 'Sales',      icon: Briefcase },
+  { name: 'Finance',    icon: Landmark },
 ];
 
 // ─── ForgotPinSheet ───────────────────────────────────────────────────────
@@ -76,12 +76,15 @@ function UserPanelContent({ deptName, icon: Icon, onClose }: {
   icon: LucideIcon;
   onClose: () => void;
 }) {
-  const users = mockUsers.filter((u) => u.department === deptName);
+  // "Admin & Manager" card menampilkan user dari dept Admin ATAU Manager
+  const users = mockUsers.filter((u) =>
+    deptName === 'Admin & Manager'
+      ? u.department === 'Admin' || u.department === 'Manager'
+      : u.department === deptName
+  );
 
   function handleUserTap(user: (typeof mockUsers)[number]) {
     onClose();
-    // isLoggedIn: false — user dipilih tapi belum masuk PIN
-    // Guard di /login cek session.userId, bukan isLoggedIn
     useUIStore.getState().setSession({
       userId: user.id,
       name: user.name,
@@ -128,7 +131,7 @@ function UserPanelContent({ deptName, icon: Icon, onClose }: {
             </div>
             <div className="flex flex-col items-start">
               <span className="text-sm font-semibold text-[#1A1A2E] leading-tight">{user.name}</span>
-              <span className="text-[11px] text-[#6B7280] capitalize">{user.role}</span>
+              <span className="text-[11px] text-[#6B7280] capitalize">{user.role} · {user.department}</span>
             </div>
           </button>
         ))}
