@@ -175,7 +175,6 @@ export default function JobsPage() {
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [debouncedSearch, setDebouncedSearch] = useState(searchQuery);
 
-  // Semua hooks sebelum early return
   const handleToggle = useCallback((id: string) => {
     setExpandedItemId(expandedItemId === id ? null : id);
   }, [expandedItemId, setExpandedItemId]);
@@ -211,16 +210,13 @@ export default function JobsPage() {
     );
   }
 
-  const dept = session.department.toUpperCase(); // fix case-mismatch dengan mockData
+  const dept = session.department.toUpperCase();
 
-  // Filter: tampilkan item bulan ini ATAU semua bulan (month filter hanya informatif)
-  // mockData items punya createdAt 2026-04-xx → cocok dengan selectedMonth 2026-04
   const filtered = mockItems.filter((item) => {
     if (item.stage !== dept) return false;
     if (selectedSegment === 'active' && item.allNG) return false;
     if (selectedSegment === 'archive' && !item.allNG && item.stage !== 'DONE') return false;
-    // Month filter — cek tahun-bulan dari createdAt atau updatedAt
-    const itemMonth = (d: string) => d.slice(0, 7); // "2026-04"
+    const itemMonth = (d: string) => d.slice(0, 7);
     const inMonth = itemMonth(item.createdAt) === selectedMonth ||
                     itemMonth(item.updatedAt) === selectedMonth;
     if (!inMonth) return false;
@@ -251,13 +247,7 @@ export default function JobsPage() {
       <div className="sticky top-0 z-30 bg-[#F8F9FA]">
         <StickyHeader
           title="Tugas Saya"
-          leftSlot={
-            <ProfileAvatar
-              name={session.name}
-              department={session.department}
-              role={session.role}
-            />
-          }
+          leftSlot={<ProfileAvatar name={session.name} />}
           rightSlot={<NotificationBell />}
         />
         <div className="mx-4 mt-2">
