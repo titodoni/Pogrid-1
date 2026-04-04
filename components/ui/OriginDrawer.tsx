@@ -152,7 +152,8 @@ export function OriginDrawer({
         }}
         onTransitionEnd={handleTransitionEnd}
       >
-        <div ref={phase !== 'measure' ? innerRef : undefined} className="flex flex-col">
+        {/* phase is never 'measure' here — guarded by early return above */}
+        <div ref={innerRef} className="flex flex-col">
           {children}
         </div>
       </div>
