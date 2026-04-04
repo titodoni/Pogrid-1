@@ -1,7 +1,7 @@
 'use client';
 export const dynamic = 'force-dynamic';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Pencil, ShoppingCart, Settings, Flame, ShieldCheck,
   Truck, Cog, BarChart2, Briefcase,
@@ -89,7 +89,6 @@ function UserPanelContent({ deptName, icon: Icon, onClose }: {
 
   return (
     <div className="flex flex-col">
-      {/* Card header — looks like the original card */}
       <div className="flex flex-col items-center justify-center gap-2 p-3 border-b border-[#E5E7EB] bg-white">
         <Icon size={28} className="text-[#2A7B76]" />
         <div className="flex items-center gap-1">
@@ -105,7 +104,6 @@ function UserPanelContent({ deptName, icon: Icon, onClose }: {
         </div>
       </div>
 
-      {/* User list */}
       <div className="overflow-y-auto">
         {users.length === 0 ? (
           <p className="text-xs text-[#6B7280] text-center py-4">Tidak ada pengguna.</p>
@@ -176,7 +174,6 @@ export default function SelectDeptPage() {
         <h1 className="text-2xl font-bold text-[#1A1A2E] text-center mt-4">Pilih Departemen</h1>
       </div>
 
-      {/* Grid */}
       <div className="grid grid-cols-3 gap-3">
         {DEPT_CARDS.map(({ name, icon: Icon }) => (
           <button
@@ -208,7 +205,6 @@ export default function SelectDeptPage() {
         </button>
       </div>
 
-      {/* Expanding card panel — anchored to tapped card */}
       <OriginDrawer
         open={drawer.open}
         triggerRect={drawer.rect}

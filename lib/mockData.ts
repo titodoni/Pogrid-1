@@ -1,6 +1,5 @@
 // ─── POGrid Mock Data — Phase 1 Foundation ──────────────────────────────────
 // Mode: Mock-only. No imports from external libs. Fully self-contained.
-// mockItems exported as `let` — allows in-memory mutation during mock session.
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -81,20 +80,20 @@ export interface MockSession {
 // ─── mockUsers ───────────────────────────────────────────────────────────────
 
 export const mockUsers: MockUser[] = [
-  { id: 'user-drafter-01',   name: 'Budi Santoso',    department: 'Drafting',   role: 'worker',  pin: '1234', active: true },
-  { id: 'user-drafter-02',   name: 'Fitri Anggraeni', department: 'Drafting',   role: 'worker',  pin: '1234', active: true },
-  { id: 'user-purchasing-01',name: 'Siti Rahayu',     department: 'Purchasing', role: 'worker',  pin: '1234', active: true },
-  { id: 'user-machining-01', name: 'Ahmad Fauzi',     department: 'Machining',  role: 'worker',  pin: '1234', active: true },
-  { id: 'user-machining-02', name: 'Rizki Pratama',   department: 'Machining',  role: 'worker',  pin: '1234', active: true },
-  { id: 'user-fabrikasi-01', name: 'Hendra Wijaya',   department: 'Fabrikasi',  role: 'worker',  pin: '1234', active: true },
-  { id: 'user-fabrikasi-02', name: 'Wahyu Nugroho',   department: 'Fabrikasi',  role: 'worker',  pin: '1234', active: true },
-  { id: 'user-qc-01',        name: 'Dewi Kusuma',     department: 'QC',         role: 'worker',  pin: '1234', active: true },
-  { id: 'user-qc-02',        name: 'Eko Purnomo',     department: 'QC',         role: 'worker',  pin: '1234', active: true },
-  { id: 'user-delivery-01',  name: 'Yusuf Hidayat',   department: 'Delivery',   role: 'worker',  pin: '1234', active: true },
-  { id: 'user-admin-01',     name: 'Agus Setiawan',   department: 'Admin',      role: 'admin',   pin: '0000', active: true },
-  { id: 'user-manager-01',   name: 'Bambang Suryadi', department: 'Manager',    role: 'manager', pin: '1234', active: true },
-  { id: 'user-sales-01',     name: 'Ratna Sari',      department: 'Sales',      role: 'sales',   pin: '1234', active: true },
-  { id: 'user-finance-01',   name: 'Lestari Ningrum', department: 'Finance',    role: 'finance', pin: '1234', active: true },
+  { id: 'user-drafter-01',    name: 'Budi Santoso',    department: 'Drafting',   role: 'worker',  pin: '1234', active: true },
+  { id: 'user-drafter-02',    name: 'Fitri Anggraeni', department: 'Drafting',   role: 'worker',  pin: '1234', active: true },
+  { id: 'user-purchasing-01', name: 'Siti Rahayu',     department: 'Purchasing', role: 'worker',  pin: '1234', active: true },
+  { id: 'user-machining-01',  name: 'Ahmad Fauzi',     department: 'Machining',  role: 'worker',  pin: '1234', active: true },
+  { id: 'user-machining-02',  name: 'Rizki Pratama',   department: 'Machining',  role: 'worker',  pin: '1234', active: true },
+  { id: 'user-fabrikasi-01',  name: 'Hendra Wijaya',   department: 'Fabrikasi',  role: 'worker',  pin: '1234', active: true },
+  { id: 'user-fabrikasi-02',  name: 'Wahyu Nugroho',   department: 'Fabrikasi',  role: 'worker',  pin: '1234', active: true },
+  { id: 'user-qc-01',         name: 'Dewi Kusuma',     department: 'QC',         role: 'worker',  pin: '1234', active: true },
+  { id: 'user-qc-02',         name: 'Eko Purnomo',     department: 'QC',         role: 'worker',  pin: '1234', active: true },
+  { id: 'user-delivery-01',   name: 'Yusuf Hidayat',   department: 'Delivery',   role: 'worker',  pin: '1234', active: true },
+  { id: 'user-admin-01',      name: 'Agus Setiawan',   department: 'Admin',      role: 'admin',   pin: '0000', active: true },
+  { id: 'user-manager-01',    name: 'Bambang Suryadi', department: 'Manager',    role: 'manager', pin: '1234', active: true },
+  { id: 'user-sales-01',      name: 'Ratna Sari',      department: 'Sales',      role: 'sales',   pin: '1234', active: true },
+  { id: 'user-finance-01',    name: 'Lestari Ningrum', department: 'Finance',    role: 'finance', pin: '1234', active: true },
 ];
 
 // ─── mockDepartments ─────────────────────────────────────────────────────────
@@ -150,9 +149,11 @@ export const mockPOs: MockPO[] = [
   },
 ];
 
-// ─── mockItems (use let — allows in-memory mutation) ─────────────────────────
+// ─── mockItems ───────────────────────────────────────────────────────────────
+// NOTE: object properties (progress, updatedAt) are mutated in-memory during
+// mock sessions — array reference itself never changes, so const is correct.
 
-export let mockItems: MockItem[] = [
+export const mockItems: MockItem[] = [
   {
     id: 'item-01',
     poId: 'po-001',
@@ -408,10 +409,10 @@ export let mockItems: MockItem[] = [
   },
 ];
 
-// ─── Audit log arrays (start empty) ──────────────────────────────────────────
+// ─── Audit log arrays ─────────────────────────────────────────────────────────
 
-export let mockReturnItems: Record<string, unknown>[] = [];
-export let mockItemTracks: Record<string, unknown>[] = [];
+export const mockReturnItems: Record<string, unknown>[] = [];
+export const mockItemTracks: Record<string, unknown>[] = [];
 
 // ─── mockSession (default for UI simulation) ──────────────────────────────────
 
