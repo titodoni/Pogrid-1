@@ -5,7 +5,7 @@ import { Delete, Phone, Mail, MessageCircle, X } from 'lucide-react';
 import { mockUsers } from '@/lib/mockData';
 import useUIStore from '@/store/uiStore';
 
-// ─── Helpers ───────────────────────────────────────────────────────────────
+// ─── Helpers ───────────────────────────────────────────────────────────────────────
 
 function getInitials(name: string): string {
   const parts = name.trim().split(' ');
@@ -24,18 +24,16 @@ function getRoleHomeRoute(role: string): string {
   }
 }
 
-// ─── Shared ForgotPinSheet (same component as select-dept) ──────────────────────
+// ─── ForgotPinSheet ───────────────────────────────────────────────────────────────────
 
 function ForgotPinSheet({ onClose }: { onClose: () => void }) {
   return (
     <>
-      {/* Overlay */}
       <div
         className="fixed inset-0 bg-black/40 z-40"
         onClick={onClose}
         aria-hidden="true"
       />
-      {/* Sheet */}
       <div className="fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-2xl shadow-xl animate-slide-up max-h-[80vh] flex flex-col">
         <div className="flex items-center justify-between px-4 py-3 border-b border-[#E5E7EB] flex-shrink-0">
           <span className="text-lg font-semibold text-[#1A1A2E]">Lupa PIN</span>
@@ -94,14 +92,14 @@ function ForgotPinSheet({ onClose }: { onClose: () => void }) {
   );
 }
 
-// ─── Main Component ────────────────────────────────────────────────────────────
+// ─── Main Component ────────────────────────────────────────────────────────────────────
 
 export default function LoginPage() {
   const session = useUIStore((s) => s.session);
 
   const [pin, setPin]               = useState('');
   const [shaking, setShaking]       = useState(false);
-  const [dotError, setDotError]     = useState(false);  // red flash on dots
+  const [dotError, setDotError]     = useState(false);
   const [errorMsg, setErrorMsg]     = useState<string | null>(null);
   const [attempts, setAttempts]     = useState(0);
   const [locked, setLocked]         = useState(false);
@@ -114,10 +112,12 @@ export default function LoginPage() {
   const errRef   = useRef<ReturnType<typeof setTimeout> | null>(null);
   const toastRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // ── Session guard ──
+  // ── Session guard: cek userId ada, bukan isLoggedIn ──
+  // User boleh masuk /login jika sudah pilih nama (userId ada),
+  // meskipun isLoggedIn masih false (belum validasi PIN)
   useEffect(() => {
     const s = useUIStore.getState().session;
-    if (!s || !s.isLoggedIn) {
+    if (!s || !s.userId) {
       window.location.href = '/select-dept';
     }
   }, []);
@@ -184,7 +184,7 @@ export default function LoginPage() {
 
   function validatePin(enteredPin: string) {
     const s = useUIStore.getState().session;
-    if (!s) { window.location.href = '/select-dept'; return; }
+    if (!s || !s.userId) { window.location.href = '/select-dept'; return; }
 
     const user = mockUsers.find((u) => u.id === s.userId);
     const correct = user?.pin === enteredPin;
@@ -192,7 +192,7 @@ export default function LoginPage() {
     setAttempts(newAttempts);
 
     if (correct) {
-      // Success
+      // PIN benar — baru set isLoggedIn: true
       useUIStore.getState().setSession({ ...s, isLoggedIn: true });
       setToast(true);
       toastRef.current = setTimeout(() => {
@@ -224,7 +224,7 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen bg-[#F8F9FA] flex flex-col relative">
 
-      {/* ── App Bar (sticky top-0) ── */}
+      {/* ── App Bar ── */}
       <header className="sticky top-0 z-30 bg-[#F8F9FA] flex items-center px-2 h-14">
         <button
           type="button"
