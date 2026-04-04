@@ -80,9 +80,14 @@ function UserPanelContent({ deptName, icon: Icon, onClose }: {
 
   function handleUserTap(user: (typeof mockUsers)[number]) {
     onClose();
+    // isLoggedIn: false — user dipilih tapi belum masuk PIN
+    // Guard di /login cek session.userId, bukan isLoggedIn
     useUIStore.getState().setSession({
-      userId: user.id, name: user.name,
-      department: user.department, role: user.role, isLoggedIn: true,
+      userId: user.id,
+      name: user.name,
+      department: user.department,
+      role: user.role,
+      isLoggedIn: false,
     });
     setTimeout(() => { window.location.href = '/login'; }, 80);
   }
