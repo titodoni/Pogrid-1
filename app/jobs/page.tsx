@@ -5,9 +5,9 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { LogOut, Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import { mockItems, type MockItem } from '@/lib/mockData';
 import useUIStore from '@/store/uiStore';
-import StickyHeader from '@/components/layout/StickyHeader';
-import BottomNav from '@/components/layout/BottomNav';
-import ProfileAvatar from '@/components/layout/ProfileAvatar';
+import { StickyHeader } from '@/components/layout/StickyHeader';
+import { BottomNav } from '@/components/layout/BottomNav';
+import { ProfileAvatar } from '@/components/layout/ProfileAvatar';
 import NotificationBell from '@/components/ui/NotificationBell';
 import StageBadge from '@/components/ui/StageBadge';
 import { ReworkPill, ReturnPill, VendorPill, RoutingPill } from '@/components/ui/PillBadges';
@@ -15,7 +15,7 @@ import ProgressSlider from '@/components/ui/ProgressSlider';
 import StepperControl from '@/components/ui/StepperControl';
 import BatalkanControl from '@/components/ui/BatalkanControl';
 
-// ─── Helper ───────────────────────────────────────────────────────────────────
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function formatMonth(ym: string): string {
   const [y, m] = ym.split('-');
@@ -38,11 +38,11 @@ function nextMonth(ym: string): string {
 function overallProgress(item: MockItem): number {
   if (item.stageBreakdown.length === 0) return 0;
   const total = item.stageBreakdown.reduce((s, b) => s + b.progress, 0);
-  const maxTotal = item.stageBreakdown.reduce((s, b) => s + (b.stage === item.stage ? item.qty : 100), 0);
+  const maxTotal = item.stageBreakdown.length * 100;
   return maxTotal === 0 ? 0 : Math.round((total / maxTotal) * 100);
 }
 
-// ─── WorkerItemSummaryCard ────────────────────────────────────────────────────
+// ─── WorkerItemSummaryCard ───────────────────────────────────────────────────
 
 function WorkerItemSummaryCard({
   item,
@@ -60,7 +60,6 @@ function WorkerItemSummaryCard({
   const openBottomSheet = useUIStore((s) => s.openBottomSheet);
   const [localProgress, setLocalProgress] = useState(item.progress);
 
-  // Keep local progress in sync if parent item was mutated externally
   useEffect(() => { setLocalProgress(item.progress); }, [item.progress]);
 
   let startTimerFn: ((prev: number) => void) | null = null;
@@ -71,7 +70,6 @@ function WorkerItemSummaryCard({
       (item.qty === 1 && localProgress === 100) ||
       (item.qty > 1 && localProgress === item.qty);
 
-    // Mutate in-memory
     item.progress = localProgress;
     item.updatedAt = new Date().toISOString();
 
@@ -80,7 +78,7 @@ function WorkerItemSummaryCard({
 
     if (isComplete) {
       const sheet = item.stage === 'QC' ? 'qc-gate' : 'delivery-gate';
-      openBottomSheet(sheet, item.id); // Phase 2 stub — no sheet renders yet
+      openBottomSheet(sheet, item.id);
     }
   }
 
@@ -96,13 +94,7 @@ function WorkerItemSummaryCard({
 
   return (
     <div className="bg-white rounded-xl border border-[#E5E7EB] mb-3 overflow-hidden">
-      {/* Collapsed header — always visible */}
-      <button
-        type="button"
-        onClick={onToggle}
-        className="w-full text-left p-4"
-      >
-        {/* Row A */}
+      <button type="button" onClick={onToggle} className="w-full text-left p-4">
         <div className="flex justify-between items-start">
           <span className="text-lg font-semibold text-[#1A1A2E] flex-1 pr-2">{item.name}</span>
           {item.issues.some((i) => !i.resolved)
@@ -110,30 +102,21 @@ function WorkerItemSummaryCard({
             : <span className="text-sm text-[#6B7280]">{overall}%</span>
           }
         </div>
-
-        {/* Row B */}
         <p className="text-[13px] mt-0.5" style={{ color: isPastDue ? '#B33941' : '#6B7280' }}>
-          {item.po.clientName} · {item.qty} pcs · Due {dueDateStr}
-          {isPastDue && ' ⚠'}
+          {item.po.clientName} · {item.qty} pcs · Due {dueDateStr}{isPastDue && ' ⚠'}
         </p>
-
-        {/* Row C — stage breakdown summary */}
         <p className="text-[12px] text-[#9CA3AF] mt-1">
-          {item.stageBreakdown.map((b) => `${b.stage.slice(0, 4)} ${b.stage === item.stage ? `${item.progress}/${item.qty}` : `${b.progress}%`}`).join(' · ')}
+          {item.stageBreakdown.map((b) =>
+            `${b.stage.slice(0, 4)} ${b.stage === item.stage ? `${item.progress}/${item.qty}` : `${b.progress}%`}`
+          ).join(' · ')}
         </p>
-
-        {/* Row D — overall progress bar */}
         <div className="mt-2 h-1.5 rounded-full bg-[#E5E7EB]">
           <div className="h-1.5 rounded-full bg-[#2A7B76]" style={{ width: `${overall}%` }} />
         </div>
-
-        {/* Row E */}
         <div className="flex justify-between items-center mt-2">
           <span className="text-[12px] text-[#9CA3AF]">{item.lastEventLabel} · {item.lastEventTime}</span>
           <span className="text-[12px] text-[#2A7B76]">{item.stage} → {item.qty === 1 ? `${item.progress}%` : `${item.progress}/${item.qty}`}</span>
         </div>
-
-        {/* Pills */}
         <div className="flex gap-1 flex-wrap mt-2">
           <ReworkPill parentItemId={item.parentItemId} parentName={item.parent?.name} />
           <ReturnPill source={item.source} returnBreadcrumb={item.returnBreadcrumb} />
@@ -142,13 +125,9 @@ function WorkerItemSummaryCard({
         </div>
       </button>
 
-      {/* Expanded task panel */}
       {expanded && (
         <div className="px-4 pb-4 border-t border-[#E5E7EB] animate-fade-in">
-          <p className="text-sm font-semibold text-[#1D3B4D] mt-4 mb-2">
-            UPDATE · {item.stage}
-          </p>
-
+          <p className="text-sm font-semibold text-[#1D3B4D] mt-4 mb-2">UPDATE · {item.stage}</p>
           {item.allNG ? (
             <p className="text-[13px] text-[#B33941] font-medium">Semua unit gagal QC</p>
           ) : isOwnerStage ? (
@@ -158,7 +137,6 @@ function WorkerItemSummaryCard({
           ) : (
             <p className="text-sm text-[#6B7280]">Read-only — bukan stage kamu</p>
           )}
-
           {isOwnerStage && !item.allNG && (
             <div className="flex justify-between items-center mt-3">
               <BatalkanControl
@@ -166,18 +144,15 @@ function WorkerItemSummaryCard({
                 onUndo={handleUndo}
                 onStartTimer={(fn) => { startTimerFn = fn; }}
               />
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={handleSave}
-                  className="rounded-lg px-4 h-10 text-sm font-medium bg-[#2A7B76] text-white"
-                >
-                  Simpan
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={handleSave}
+                className="rounded-lg px-4 h-10 text-sm font-medium bg-[#2A7B76] text-white"
+              >
+                Simpan
+              </button>
             </div>
           )}
-
           <button
             type="button"
             className="mt-2 text-[#B33941] text-sm font-medium"
@@ -220,28 +195,23 @@ export default function JobsPage() {
 
   const dept = session?.department ?? '';
 
-  // Filtering pipeline
   const filtered = mockItems.filter((item) => {
-    // Step 1 — dept filter
     if (item.stage !== dept) return false;
-    // Step 2 — segment
     if (selectedSegment === 'active' && item.allNG) return false;
     if (selectedSegment === 'archive' && !item.allNG && item.stage !== 'DONE') return false;
-    // Step 3 — month (createdAt or updatedAt)
     const inMonth = item.createdAt.startsWith(selectedMonth) || item.updatedAt.startsWith(selectedMonth);
     if (!inMonth) return false;
-    // Step 4 — search
     if (debouncedSearch) {
       const q = debouncedSearch.toLowerCase();
-      const match = item.name.toLowerCase().includes(q)
-        || item.po.clientName.toLowerCase().includes(q)
-        || item.po.number.toLowerCase().includes(q);
+      const match =
+        item.name.toLowerCase().includes(q) ||
+        item.po.clientName.toLowerCase().includes(q) ||
+        item.po.number.toLowerCase().includes(q);
       if (!match) return false;
     }
     return true;
   });
 
-  // Sort: urgent first, then updatedAt ASC (stalest first) for active
   const sorted = [...filtered].sort((a, b) => {
     if (selectedSegment === 'active') {
       if (a.urgent !== b.urgent) return a.urgent ? -1 : 1;
@@ -250,7 +220,6 @@ export default function JobsPage() {
     return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
   });
 
-  // Count for segment tabs
   const activeCount = mockItems.filter((i) => i.stage === dept && !i.allNG).length;
   const archiveCount = mockItems.filter((i) => i.stage === dept && (i.allNG || i.stage === 'DONE')).length;
 
@@ -263,8 +232,6 @@ export default function JobsPage() {
     newProgress: number,
     previousProgress: number,
   ) => {
-    // In-memory mutation already done in WorkerItemSummaryCard.handleSave
-    // Just log for now — Phase 5 will wire real PATCH
     console.log('[mock] save', itemId, newProgress, previousProgress);
   }, []);
 
@@ -272,10 +239,9 @@ export default function JobsPage() {
 
   return (
     <div className="min-h-screen bg-[#F8F9FA]">
-      {/* Sticky header stack */}
       <div className="sticky top-0 z-30 bg-[#F8F9FA]">
         <StickyHeader
-          left={<ProfileAvatar />}
+          left={<ProfileAvatar name={session.name} />}
           center={<span className="text-xl font-bold text-[#1A1A2E]">Tugas Saya</span>}
           right={
             <div className="flex items-center gap-2">
@@ -290,8 +256,6 @@ export default function JobsPage() {
             </div>
           }
         />
-
-        {/* Search */}
         <div className="mx-4 mt-2">
           <div className="flex items-center gap-2 h-12 bg-white border border-[#E5E7EB] rounded-xl px-4">
             <Search size={16} color="#6B7280" />
@@ -304,8 +268,6 @@ export default function JobsPage() {
             />
           </div>
         </div>
-
-        {/* Segmented control */}
         <div className="mx-4 mt-2 flex rounded-xl bg-[#F3F4F6] p-1">
           {(['active', 'archive'] as const).map((seg) => (
             <button
@@ -323,14 +285,12 @@ export default function JobsPage() {
             </button>
           ))}
         </div>
-
-        {/* Month selector */}
         <div className="mx-4 mt-2 mb-3 flex items-center justify-between">
           <button
             type="button"
             onClick={() => setSelectedMonth(prevMonth(selectedMonth))}
-            className="flex items-center justify-center"
             style={{ minWidth: 44, minHeight: 44 }}
+            className="flex items-center justify-center"
             aria-label="Bulan sebelumnya"
           >
             <ChevronLeft size={20} color="#1A1A2E" />
@@ -342,8 +302,8 @@ export default function JobsPage() {
           <button
             type="button"
             onClick={() => setSelectedMonth(nextMonth(selectedMonth))}
-            className="flex items-center justify-center"
             style={{ minWidth: 44, minHeight: 44 }}
+            className="flex items-center justify-center"
             aria-label="Bulan berikutnya"
           >
             <ChevronRight size={20} color="#1A1A2E" />
@@ -351,7 +311,6 @@ export default function JobsPage() {
         </div>
       </div>
 
-      {/* Content */}
       <div className="px-4 pb-24">
         {sorted.length === 0 ? (
           <div className="flex flex-col items-center justify-center pt-16 gap-4">
@@ -360,10 +319,8 @@ export default function JobsPage() {
               <rect x="16" y="24" width="20" height="4" rx="2" fill="#9CA3AF" />
               <rect x="16" y="32" width="32" height="4" rx="2" fill="#9CA3AF" />
               <rect x="16" y="40" width="24" height="4" rx="2" fill="#9CA3AF" />
-              <circle cx="48" cy="44" r="10" fill="#2A7B76" opacity="0.15" />
-              <path d="M44 44h8M48 40v8" stroke="#2A7B76" strokeWidth="2" strokeLinecap="round" />
             </svg>
-            <p className="text-sm text-[#6B7280] text-center">Tidak ada pekerjaan aktif hari ini</p>
+            <p className="text-sm text-[#6B7280] text-center">Tidak ada pekerjaan aktif bulan ini</p>
           </div>
         ) : (
           sorted.map((item) => (
@@ -379,7 +336,7 @@ export default function JobsPage() {
         )}
       </div>
 
-      <BottomNav />
+      <BottomNav role={session.role} department={session.department} />
     </div>
   );
 }
