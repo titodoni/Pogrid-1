@@ -179,7 +179,20 @@ export default function JobsPage() {
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [debouncedSearch, setDebouncedSearch] = useState(searchQuery);
 
-  // Guard: tunggu hydration selesai dulu sebelum cek session
+  // Semua useCallback HARUS di sini — sebelum early return apapun
+  const handleToggle = useCallback((id: string) => {
+    setExpandedItemId(expandedItemId === id ? null : id);
+  }, [expandedItemId, setExpandedItemId]);
+
+  const handleSave = useCallback((
+    itemId: string,
+    newProgress: number,
+    previousProgress: number,
+  ) => {
+    console.log('[mock] save', itemId, newProgress, previousProgress);
+  }, []);
+
+  // Guard: tunggu hydration dulu
   useEffect(() => {
     if (!hasHydrated) return;
     if (!session || !session.isLoggedIn) {
@@ -197,7 +210,7 @@ export default function JobsPage() {
     searchTimerRef.current = setTimeout(() => setDebouncedSearch(val), 300);
   }
 
-  // Tampilkan loading splash selama hydration atau sebelum guard selesai
+  // Spinner selama hydration atau session belum valid
   if (!hasHydrated || !session || !session.isLoggedIn) {
     return (
       <div className="min-h-screen bg-[#F8F9FA] flex items-center justify-center">
@@ -235,18 +248,6 @@ export default function JobsPage() {
 
   const activeCount = mockItems.filter((i) => i.stage === dept && !i.allNG).length;
   const archiveCount = mockItems.filter((i) => i.stage === dept && (i.allNG || i.stage === 'DONE')).length;
-
-  const handleToggle = useCallback((id: string) => {
-    setExpandedItemId(expandedItemId === id ? null : id);
-  }, [expandedItemId, setExpandedItemId]);
-
-  const handleSave = useCallback((
-    itemId: string,
-    newProgress: number,
-    previousProgress: number,
-  ) => {
-    console.log('[mock] save', itemId, newProgress, previousProgress);
-  }, []);
 
   return (
     <div className="min-h-screen bg-[#F8F9FA]">
