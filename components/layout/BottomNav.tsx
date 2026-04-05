@@ -3,8 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import {
   Briefcase,
-  LayoutGrid,
   AlertTriangle,
+  LayoutGrid,
   ClipboardList,
   Users,
   Building2,
@@ -12,10 +12,8 @@ import {
   BarChart2,
   FileDown,
   DollarSign,
-  LogOut,
   type LucideIcon,
 } from 'lucide-react';
-import useUIStore from '@/store/uiStore';
 
 interface BottomNavProps {
   role: string;
@@ -31,8 +29,8 @@ interface Tab {
 function getTabsForRole(role: string): Tab[] {
   if (role === 'worker') {
     return [
-      { label: 'Tugas', route: '/jobs', icon: Briefcase },
-      { label: 'Papan', route: '/board', icon: LayoutGrid },
+      { label: 'Tugas',   route: '/jobs',   icon: Briefcase },
+      { label: 'Kendala', route: '/issues', icon: AlertTriangle },
     ];
   }
 
@@ -73,7 +71,6 @@ function getTabsForRole(role: string): Tab[] {
 
 export function BottomNav({ role }: BottomNavProps) {
   const [currentPath, setCurrentPath] = useState('');
-  const clearSession = useUIStore((s) => s.clearSession);
 
   useEffect(() => {
     setCurrentPath(window.location.pathname);
@@ -81,15 +78,13 @@ export function BottomNav({ role }: BottomNavProps) {
 
   const tabs = getTabsForRole(role);
 
-  function handleLogout() {
-    clearSession();
-    window.location.href = '/select-dept';
-  }
-
   return (
     <nav
       className="fixed bottom-0 left-0 right-0 bg-white border-t border-[#E5E7EB] z-50"
-      style={{ height: 'calc(64px + env(safe-area-inset-bottom, 0px))', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+      style={{
+        height: 'calc(64px + env(safe-area-inset-bottom, 0px))',
+        paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+      }}
     >
       <div className="flex items-center h-16">
         {tabs.map((tab) => {
@@ -111,19 +106,6 @@ export function BottomNav({ role }: BottomNavProps) {
             </button>
           );
         })}
-
-        {role === 'worker' && (
-          <button
-            type="button"
-            onClick={handleLogout}
-            className="flex flex-col items-center justify-center gap-0.5 h-full px-4"
-            style={{ minHeight: 64, minWidth: 64, color: '#9CA3AF' }}
-            aria-label="Keluar"
-          >
-            <LogOut size={24} />
-            <span className="text-xs font-medium">Keluar</span>
-          </button>
-        )}
       </div>
     </nav>
   );
