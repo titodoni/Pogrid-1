@@ -1,7 +1,7 @@
 'use client';
 export const dynamic = 'force-dynamic';
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import { mockItems, type MockItem } from '@/lib/mockData';
 import useUIStore from '@/store/uiStore';
@@ -70,8 +70,8 @@ function getDueDateMeta(deliveryDate: string): DueDateMeta {
   return { dueText, countdownText: `${diffDays} hari lagi`, urgency: 'safe' };
 }
 
-// ─── Gate Entry Types ────────────────────────────────────────────────────────────
-// Phase 2: swap these mock mutations to open gate sheets
+// ─── Gate Entry Types ─────────────────────────────────────────────────────────
+// Phase 2: swap mock mutations to open gate sheets
 type GateType = 'DELIVERY_CONFIRM' | 'QC_PASS' | 'QC_NG';
 
 // ─── WorkerItemSummaryCard ─────────────────────────────────────────────────────
@@ -89,7 +89,7 @@ function WorkerItemSummaryCard({
   expanded: boolean;
   onToggle: () => void;
   onSave: (itemId: string, newProgress: number, previousProgress: number) => void;
-  onMockMutated: () => void; // triggers re-render in parent after mock mutation
+  onMockMutated: () => void;
 }) {
   const openBottomSheet = useUIStore((s) => s.openBottomSheet);
   const [localProgress, setLocalProgress] = useState(item.progress);
@@ -99,7 +99,7 @@ function WorkerItemSummaryCard({
 
   useEffect(() => { setLocalProgress(item.progress); }, [item.progress]);
 
-  // FIX 6: scroll into view on expand, 64px offset for sticky header
+  // FIX 6: auto-scroll on expand with 64px sticky-header offset
   useEffect(() => {
     if (!expanded) return;
     const t = setTimeout(() => {
@@ -110,40 +110,38 @@ function WorkerItemSummaryCard({
 
   const hasUnsaved = localProgress !== item.progress;
 
-  // ─── Gate Entry Handler ────────────────────────────────────────────
-  // Phase 2: replace mock block with openBottomSheet call
+  // ─── Gate Entry Handler ───────────────────────────────────────────────────
+  // Phase 2: replace mock block body with openBottomSheet call
   function handleGateEntry(type: GateType) {
     if (exiting) return;
     setExiting(true);
     setTimeout(() => {
       const now = new Date().toISOString();
+      const timeStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+
       if (type === 'DELIVERY_CONFIRM') {
         // Phase 2: openBottomSheet('delivery-gate', item.id)
         item.stage = 'DONE';
         item.progress = 100;
         item.updatedAt = now;
         item.lastEventLabel = 'Terkirim';
-        item.lastEventTime = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+        item.lastEventTime = timeStr;
       } else if (type === 'QC_PASS') {
-        // Phase 2: openBottomSheet('qc-gate', item.id) with Path A
+        // Phase 2: openBottomSheet('qc-gate', item.id) — Path A
         item.stage = 'DELIVERY';
         item.progress = 0;
         item.updatedAt = now;
         item.lastEventLabel = 'Lulus QC';
-        item.lastEventTime = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
-        // Update stageBreakdown QC to 100
+        item.lastEventTime = timeStr;
         const qcBreak = item.stageBreakdown.find((b) => b.stage === 'QC');
         if (qcBreak) qcBreak.progress = 100;
       } else if (type === 'QC_NG') {
-        // Phase 2: openBottomSheet('qc-gate', item.id) with Path B (ngQty=1 forced)
+        // Phase 2: openBottomSheet('qc-gate', item.id) — Path B (ngQty=1 forced)
         item.allNG = true;
         item.updatedAt = now;
         item.lastEventLabel = 'Semua unit gagal QC';
-        item.lastEventTime = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
-        // Spawn RW child
-        const rwCount = mockItems.filter(
-          (i) => i.parentItemId === item.id
-        ).length;
+        item.lastEventTime = timeStr;
+        const rwCount = mockItems.filter((i) => i.parentItemId === item.id).length;
         const rwItem: MockItem = {
           id: `${item.id}-rw${rwCount + 1}`,
           poId: item.poId,
@@ -165,12 +163,13 @@ function WorkerItemSummaryCard({
           createdAt: now,
           updatedAt: now,
           lastEventLabel: 'Item rework dibuat',
-          lastEventTime: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
+          lastEventTime: timeStr,
           issues: [],
           stageBreakdown: [{ stage: 'QC', progress: 0, isStalled: false }],
         };
         mockItems.push(rwItem);
       }
+
       setExiting(false);
       onMockMutated();
     }, 250);
@@ -197,11 +196,7 @@ function WorkerItemSummaryCard({
   const latestProgressPct = item.qty === 1 ? `${item.progress}%` : `${item.progress}/${item.qty}`;
   const latestUpdateText = `${latestProgressPct} → ${item.stage} · ${formatShortDate(item.updatedAt)}`;
 
-  // ─── Decision table: what control to render ────────────────────────────────────
-  // QC + qty=1   → Case B: NG + G buttons
-  // DELIVERY + qty=1 → Case A: Terkirim button
-  // any + qty>1  → StepperControl
-  // other + qty=1 → ProgressSlider
+  // Decision table — FIX 5 (P1-FIX)
   const isBinaryQC       = item.stage === 'QC' && item.qty === 1;
   const isBinaryDelivery = item.stage === 'DELIVERY' && item.qty === 1;
   const isBinary         = isBinaryQC || isBinaryDelivery;
@@ -213,8 +208,6 @@ function WorkerItemSummaryCard({
     if (!isOwnerStage) {
       return <p className="text-sm text-[#6B7280]">Read-only — bukan stage kamu</p>;
     }
-
-    // Case A: DELIVERY, qty = 1
     if (isBinaryDelivery) {
       return (
         <button
@@ -228,8 +221,6 @@ function WorkerItemSummaryCard({
         </button>
       );
     }
-
-    // Case B: QC, qty = 1
     if (isBinaryQC) {
       return (
         <div className="flex gap-3">
@@ -238,11 +229,7 @@ function WorkerItemSummaryCard({
             onClick={() => handleGateEntry('QC_NG')}
             disabled={exiting}
             className="flex-1 rounded-xl text-[14px] font-medium bg-white"
-            style={{
-              minHeight: 56,
-              border: '1.5px solid #B33941',
-              color: '#B33941',
-            }}
+            style={{ minHeight: 56, border: '1.5px solid #B33941', color: '#B33941' }}
           >
             ❌ NG
           </button>
@@ -258,14 +245,11 @@ function WorkerItemSummaryCard({
         </div>
       );
     }
-
-    // Standard: qty > 1 → stepper; qty = 1 other stages → slider
     return item.qty === 1
       ? <ProgressSlider value={localProgress} onChange={setLocalProgress} />
       : <StepperControl current={localProgress} max={item.qty} onChange={setLocalProgress} />;
   }
 
-  // Show Batalkan + Simpan only for non-binary interactive controls
   function renderActionFooter() {
     if (item.allNG || !isOwnerStage || isBinary) return null;
     return (
@@ -303,13 +287,9 @@ function WorkerItemSummaryCard({
     <div
       ref={cardRef}
       className="bg-white rounded-xl border border-[#E5E7EB] mb-3 overflow-hidden scroll-mt-16"
-      style={{
-        opacity: exiting ? 0 : 1,
-        transition: 'opacity 250ms ease-out',
-      }}
+      style={{ opacity: exiting ? 0 : 1, transition: 'opacity 250ms ease-out' }}
     >
       <button type="button" onClick={onToggle} className="w-full text-left p-4">
-        {/* Row 1: Item name (18px bold) + PO number + badge */}
         <div className="flex justify-between items-start">
           <span className="flex-1 pr-2 leading-snug">
             <span className="text-[18px] font-bold text-[#1A1A2E]">{item.name}</span>
@@ -321,11 +301,7 @@ function WorkerItemSummaryCard({
             : <span className="text-sm text-[#6B7280]">{overall}%</span>
           }
         </div>
-
-        {/* Row 2: Customer name */}
         <p className="text-[13px] font-normal text-[#6B7280] mt-0.5">{item.po.clientName}</p>
-
-        {/* Row 3: QTY · due · countdown */}
         <p className="text-[13px] mt-1 flex flex-wrap items-center gap-x-1">
           <span className="text-[15px] font-bold text-[#1A1A2E]">{item.qty} pcs</span>
           <span className="text-[#9CA3AF]">·</span>
@@ -343,24 +319,14 @@ function WorkerItemSummaryCard({
             {countdownText}
           </span>
         </p>
-
-        {/* Row 4: Stage breakdown */}
-        <p className="text-[12px] text-[#9CA3AF] mt-1 leading-relaxed">
-          {formatStageBreakdown(item)}
-        </p>
-
-        {/* Row 5: Progress bar */}
+        <p className="text-[12px] text-[#9CA3AF] mt-1 leading-relaxed">{formatStageBreakdown(item)}</p>
         <div className="mt-2 h-1.5 rounded-full bg-[#E5E7EB]">
           <div className="h-1.5 rounded-full bg-[#2A7B76]" style={{ width: `${overall}%` }} />
         </div>
-
-        {/* Row 6: Last event + latest progress update */}
         <div className="flex justify-between items-center mt-2">
           <span className="text-[12px] text-[#9CA3AF]">{item.lastEventLabel} · {item.lastEventTime}</span>
           <span className="text-[12px] font-medium text-[#2A7B76]">{latestUpdateText}</span>
         </div>
-
-        {/* Row 7: Pills */}
         <div className="flex gap-1 flex-wrap mt-2">
           <ReworkPill parentItemId={item.parentItemId} parentName={item.parent?.name} />
           <ReturnPill source={item.source} returnBreadcrumb={item.returnBreadcrumb} />
@@ -374,7 +340,6 @@ function WorkerItemSummaryCard({
           <p className="text-sm font-semibold text-[#1D3B4D] mt-4 mb-3">UPDATE · {item.stage}</p>
           {renderTaskPanel()}
           {renderActionFooter()}
-          {/* Laporkan Masalah — always visible for non-owner or binary-stage */}
           {(!isOwnerStage || (isBinary && !item.allNG)) && (
             <button
               type="button"
@@ -407,8 +372,8 @@ export default function JobsPage() {
 
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [debouncedSearch, setDebouncedSearch] = useState(searchQuery);
-  // forceUpdate counter: increment to trigger re-render after mock mutation
   const [mutationTick, setMutationTick] = useState(0);
+
   const handleMockMutated = useCallback(() => {
     setMutationTick((n) => n + 1);
     setExpandedItemId(null);
@@ -441,6 +406,49 @@ export default function JobsPage() {
     searchTimerRef.current = setTimeout(() => setDebouncedSearch(val), 300);
   }
 
+  // dept defaults to '' when session not yet ready — useMemo must be
+  // unconditional (above early return) to satisfy rules-of-hooks
+  const dept = session?.department.toUpperCase() ?? '';
+
+  const filtered = useMemo(() => {
+    if (!dept) return [];
+    return mockItems.filter((item) => {
+      if (item.stage !== dept) return false;
+      if (selectedSegment === 'active' && item.allNG) return false;
+      if (selectedSegment === 'archive' && !item.allNG && item.stage !== 'DONE') return false;
+      const itemMonth = (d: string) => d.slice(0, 7);
+      const inMonth = itemMonth(item.createdAt) === selectedMonth ||
+                      itemMonth(item.updatedAt) === selectedMonth;
+      if (!inMonth) return false;
+      if (debouncedSearch) {
+        const q = debouncedSearch.toLowerCase();
+        const match =
+          item.name.toLowerCase().includes(q) ||
+          item.po.clientName.toLowerCase().includes(q) ||
+          item.po.number.toLowerCase().includes(q);
+        if (!match) return false;
+      }
+      return true;
+    });
+  }, [dept, selectedSegment, selectedMonth, debouncedSearch, mutationTick]);
+
+  const sorted = useMemo(() => [...filtered].sort((a, b) => {
+    if (selectedSegment === 'active') {
+      if (a.urgent !== b.urgent) return a.urgent ? -1 : 1;
+      return new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime();
+    }
+    return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+  }), [filtered, selectedSegment]);
+
+  const activeCount  = useMemo(() =>
+    mockItems.filter((i) => i.stage === dept && !i.allNG).length,
+  [dept, mutationTick]);
+
+  const archiveCount = useMemo(() =>
+    mockItems.filter((i) => i.stage === dept && (i.allNG || i.stage === 'DONE')).length,
+  [dept, mutationTick]);
+
+  // ─── Early return — BELOW all hooks ──────────────────────────────────────
   if (!hasHydrated || !session || !session.isLoggedIn) {
     return (
       <div className="min-h-screen bg-[#F8F9FA] flex items-center justify-center">
@@ -448,40 +456,6 @@ export default function JobsPage() {
       </div>
     );
   }
-
-  const dept = session.department.toUpperCase();
-
-  // mutationTick in dep array so filtered re-evaluates after mock mutations
-  const filtered = React.useMemo(() => mockItems.filter((item) => {
-    if (item.stage !== dept) return false;
-    if (selectedSegment === 'active' && item.allNG) return false;
-    if (selectedSegment === 'archive' && !item.allNG && item.stage !== 'DONE') return false;
-    const itemMonth = (d: string) => d.slice(0, 7);
-    const inMonth = itemMonth(item.createdAt) === selectedMonth ||
-                    itemMonth(item.updatedAt) === selectedMonth;
-    if (!inMonth) return false;
-    if (debouncedSearch) {
-      const q = debouncedSearch.toLowerCase();
-      const match =
-        item.name.toLowerCase().includes(q) ||
-        item.po.clientName.toLowerCase().includes(q) ||
-        item.po.number.toLowerCase().includes(q);
-      if (!match) return false;
-    }
-    return true;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [dept, selectedSegment, selectedMonth, debouncedSearch, mutationTick]);
-
-  const sorted = [...filtered].sort((a, b) => {
-    if (selectedSegment === 'active') {
-      if (a.urgent !== b.urgent) return a.urgent ? -1 : 1;
-      return new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime();
-    }
-    return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
-  });
-
-  const activeCount  = mockItems.filter((i) => i.stage === dept && !i.allNG).length;
-  const archiveCount = mockItems.filter((i) => i.stage === dept && (i.allNG || i.stage === 'DONE')).length;
 
   return (
     <div className="min-h-screen bg-[#F8F9FA]">
