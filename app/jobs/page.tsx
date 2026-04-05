@@ -53,12 +53,11 @@ function formatStageBreakdown(item: MockItem): string {
   }).join(' · ');
 }
 
-// Format updatedAt → "3 Jun"
 function formatShortDate(iso: string): string {
   return new Date(iso).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' });
 }
 
-// ─── Due Date Meta ─────────────────────────────────────────────────────────────
+// ─── Due Date Meta ────────────────────────────────────────────────────────────
 
 type Urgency = 'late' | 'critical' | 'warning' | 'soon' | 'safe';
 
@@ -84,7 +83,7 @@ function getDueDateMeta(deliveryDate: string): DueDateMeta {
   const diffDays = Math.round((due.getTime() - now.getTime()) / 86400000);
   const dueText = `Due ${due.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })}`;
 
-  if (diffDays < 0)  return { dueText, countdownText: `Terlambat ${Math.abs(diffDays)} hari`, urgency: 'late' };
+  if (diffDays < 0)   return { dueText, countdownText: `Terlambat ${Math.abs(diffDays)} hari`, urgency: 'late' };
   if (diffDays === 0) return { dueText, countdownText: 'Hari ini!', urgency: 'critical' };
   if (diffDays <= 2)  return { dueText, countdownText: `${diffDays} hari lagi`, urgency: 'critical' };
   if (diffDays <= 7)  return { dueText, countdownText: `${diffDays} hari lagi`, urgency: 'warning' };
@@ -114,13 +113,15 @@ function WorkerItemSummaryCard({
 
   useEffect(() => { setLocalProgress(item.progress); }, [item.progress]);
 
+  // FIX 6: scroll card top into view when THIS card transitions collapsed → expanded.
+  // scroll-mt-16 (64px) on the card accounts for the sticky header height.
+  // Only fires on expand (expanded === true), not on collapse.
   useEffect(() => {
-    if (expanded) {
-      const t = setTimeout(() => {
-        cardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }, 120);
-      return () => clearTimeout(t);
-    }
+    if (!expanded) return;
+    const t = setTimeout(() => {
+      cardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 100);
+    return () => clearTimeout(t);
   }, [expanded]);
 
   const hasUnsaved = localProgress !== item.progress;
@@ -144,25 +145,26 @@ function WorkerItemSummaryCard({
   const countdownColor = URGENCY_COLOR[urgency];
   const overall = overallProgress(item);
 
-  // Latest update progress display: "50% → MACHINING · 3 Jun"
   const latestProgressPct = item.qty === 1
     ? `${item.progress}%`
     : `${item.progress}/${item.qty}`;
   const latestUpdateText = `${latestProgressPct} → ${item.stage} · ${formatShortDate(item.updatedAt)}`;
 
   return (
+    // FIX 6: scroll-mt-16 = 64px offset so sticky header (56px) doesn't overlap the card top
     <div
       ref={cardRef}
-      className="bg-white rounded-xl border border-[#E5E7EB] mb-3 overflow-hidden scroll-mt-36"
+      className="bg-white rounded-xl border border-[#E5E7EB] mb-3 overflow-hidden scroll-mt-16"
     >
       <button type="button" onClick={onToggle} className="w-full text-left p-4">
 
-        {/* Row 1 — Item name (bold) + PO number (normal) + overall % or badge */}
+        {/* Row 1 — Item name (18px bold) + PO number (14px muted) + badge/% */}
         <div className="flex justify-between items-start">
-          <span className="text-[17px] leading-snug flex-1 pr-2">
-            <span className="font-bold text-[#1A1A2E]">{item.name}</span>
+          <span className="flex-1 pr-2 leading-snug">
+            {/* FIX 5: item name 18px 700 #1A1A2E — most dominant text on card */}
+            <span className="text-[18px] font-bold text-[#1A1A2E]">{item.name}</span>
             {' '}
-            <span className="font-normal text-[#6B7280] text-[14px]">({item.po.number})</span>
+            <span className="text-[13px] font-normal text-[#9CA3AF]">({item.po.number})</span>
           </span>
           {item.issues.some((i) => !i.resolved)
             ? <StageBadge item={item} />
@@ -170,10 +172,14 @@ function WorkerItemSummaryCard({
           }
         </div>
 
-        {/* Row 2 — Customer · QTY · due · countdown */}
+        {/* Row 2 — Customer name: own dedicated line, 13px 400 muted — required context */}
+        {/* FIX 5: customer name separated here, not mixed into qty/due row */}
+        <p className="text-[13px] font-normal text-[#6B7280] mt-0.5">
+          {item.po.clientName}
+        </p>
+
+        {/* Row 3 — QTY (bold) · due date · countdown (colorized) */}
         <p className="text-[13px] mt-1 flex flex-wrap items-center gap-x-1">
-          <span className="font-medium text-[#1A1A2E]">{item.po.clientName}</span>
-          <span className="text-[#9CA3AF]">·</span>
           <span className="text-[15px] font-bold text-[#1A1A2E]">{item.qty} pcs</span>
           <span className="text-[#9CA3AF]">·</span>
           <span className="text-[#6B7280]">{dueText}</span>
@@ -191,23 +197,23 @@ function WorkerItemSummaryCard({
           </span>
         </p>
 
-        {/* Row 3 — Stage breakdown */}
+        {/* Row 4 — Stage breakdown */}
         <p className="text-[12px] text-[#9CA3AF] mt-1 leading-relaxed">
           {formatStageBreakdown(item)}
         </p>
 
-        {/* Row 4 — Progress bar */}
+        {/* Row 5 — Progress bar */}
         <div className="mt-2 h-1.5 rounded-full bg-[#E5E7EB]">
           <div className="h-1.5 rounded-full bg-[#2A7B76]" style={{ width: `${overall}%` }} />
         </div>
 
-        {/* Row 5 — Latest update: "50% → MACHINING · 3 Jun" */}
+        {/* Row 6 — Last event (left) + latest progress update (right) */}
         <div className="flex justify-between items-center mt-2">
           <span className="text-[12px] text-[#9CA3AF]">{item.lastEventLabel} · {item.lastEventTime}</span>
           <span className="text-[12px] font-medium text-[#2A7B76]">{latestUpdateText}</span>
         </div>
 
-        {/* Row 6 — Pills */}
+        {/* Row 7 — Pills */}
         <div className="flex gap-1 flex-wrap mt-2">
           <ReworkPill parentItemId={item.parentItemId} parentName={item.parent?.name} />
           <ReturnPill source={item.source} returnBreadcrumb={item.returnBreadcrumb} />
@@ -274,21 +280,22 @@ function WorkerItemSummaryCard({
 // ─── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function JobsPage() {
-  const hasHydrated       = useUIStore((s) => s._hasHydrated);
-  const session           = useUIStore((s) => s.session);
-  const expandedItemId    = useUIStore((s) => s.expandedItemId);
-  const setExpandedItemId = useUIStore((s) => s.setExpandedItemId);
-  const selectedSegment   = useUIStore((s) => s.selectedSegment);
+  const hasHydrated        = useUIStore((s) => s._hasHydrated);
+  const session            = useUIStore((s) => s.session);
+  const expandedItemId     = useUIStore((s) => s.expandedItemId);
+  const setExpandedItemId  = useUIStore((s) => s.setExpandedItemId);
+  const selectedSegment    = useUIStore((s) => s.selectedSegment);
   const setSelectedSegment = useUIStore((s) => s.setSelectedSegment);
-  const selectedMonth     = useUIStore((s) => s.selectedMonth);
-  const setSelectedMonth  = useUIStore((s) => s.setSelectedMonth);
-  const searchQuery       = useUIStore((s) => s.searchQuery);
-  const setSearchQuery    = useUIStore((s) => s.setSearchQuery);
+  const selectedMonth      = useUIStore((s) => s.selectedMonth);
+  const setSelectedMonth   = useUIStore((s) => s.setSelectedMonth);
+  const searchQuery        = useUIStore((s) => s.searchQuery);
+  const setSearchQuery     = useUIStore((s) => s.setSearchQuery);
 
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [debouncedSearch, setDebouncedSearch] = useState(searchQuery);
 
   const handleToggle = useCallback((id: string) => {
+    // Only one card expanded at a time — collapse previous, expand new
     setExpandedItemId(expandedItemId === id ? null : id);
   }, [expandedItemId, setExpandedItemId]);
 
