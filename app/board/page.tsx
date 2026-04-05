@@ -14,16 +14,32 @@ import ItemCard from '@/components/ui/ItemCard';
 const FILTER_CHIPS = ['Semua', 'URGENT', 'MASALAH', 'DRAFTING', 'PURCHASING', 'MACHINING', 'FABRIKASI', 'QC', 'DELIVERY'];
 
 export default function BoardPage() {
-  const session = useUIStore((s) => s.session);
-  const boardFilters = useUIStore((s) => s.boardFilters);
+  const hasHydrated    = useUIStore((s) => s._hasHydrated);
+  const session        = useUIStore((s) => s.session);
+  const boardFilters   = useUIStore((s) => s.boardFilters);
   const toggleBoardFilter = useUIStore((s) => s.toggleBoardFilter);
-  const setBoardFilters = useUIStore((s) => s.setBoardFilters);
+  const setBoardFilters   = useUIStore((s) => s.setBoardFilters);
 
   useEffect(() => {
-    if (!session) { window.location.href = '/select-dept'; }
-  }, [session]);
+    if (!hasHydrated) return;
+    if (!session || !session.isLoggedIn) {
+      window.location.href = '/select-dept';
+      return;
+    }
+    // Workers belong on /jobs, not /board
+    if (session.role === 'worker') {
+      window.location.href = '/jobs';
+    }
+  }, [hasHydrated, session]);
 
-  if (!session) return null;
+  // Wait for sessionStorage rehydration before rendering or redirecting
+  if (!hasHydrated || !session || !session.isLoggedIn) {
+    return (
+      <div className="min-h-screen bg-[#F8F9FA] flex items-center justify-center">
+        <div className="w-12 h-12 rounded-full border-4 border-[#2A7B76] border-t-transparent animate-spin" />
+      </div>
+    );
+  }
 
   const role = session.role;
   const dept = session.department;
