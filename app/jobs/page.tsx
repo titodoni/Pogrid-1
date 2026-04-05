@@ -15,7 +15,7 @@ import ProgressSlider from '@/components/ui/ProgressSlider';
 import StepperControl from '@/components/ui/StepperControl';
 import BatalkanControl from '@/components/ui/BatalkanControl';
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function formatMonth(ym: string): string {
   const [y, m] = ym.split('-');
@@ -42,8 +42,6 @@ function overallProgress(item: MockItem): number {
   return maxTotal === 0 ? 0 : Math.round((total / maxTotal) * 100);
 }
 
-// Stage breakdown display — full name, n% format for all segments
-// e.g. "DRAFTING 0% · MACHINING 57% · QC 0%"
 function formatStageBreakdown(item: MockItem): string {
   return item.stageBreakdown.map((b) => {
     const pct = b.stage === item.stage
@@ -55,34 +53,50 @@ function formatStageBreakdown(item: MockItem): string {
   }).join(' · ');
 }
 
+// ─── Due Date Meta ────────────────────────────────────────────────────────────
+// urgency levels:
+//   'late'     → already past due      → red  + blink
+//   'critical' → today or ≤ 2 days     → red
+//   'warning'  → 3–7 days              → orange
+//   'soon'     → 8–14 days             → yellow-ish
+//   'safe'     → > 14 days             → gray/green
+
+type Urgency = 'late' | 'critical' | 'warning' | 'soon' | 'safe';
+
 interface DueDateMeta {
   dueText: string;
   countdownText: string;
-  countdownColor: string;
-  isLate: boolean;
+  urgency: Urgency;
 }
+
+const URGENCY_COLOR: Record<Urgency, string> = {
+  late:     '#B33941', // red
+  critical: '#B33941', // red
+  warning:  '#DE8F26', // orange
+  soon:     '#B08B00', // amber
+  safe:     '#4A9B6F', // green
+};
 
 function getDueDateMeta(deliveryDate: string): DueDateMeta {
   const now = new Date();
   now.setHours(0, 0, 0, 0);
   const due = new Date(deliveryDate);
   due.setHours(0, 0, 0, 0);
-  const diffMs = due.getTime() - now.getTime();
-  const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
+  const diffDays = Math.round((due.getTime() - now.getTime()) / 86400000);
 
   const dueText = `Due ${due.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })}`;
 
   if (diffDays < 0) {
-    const lateDays = Math.abs(diffDays);
-    return { dueText, countdownText: `Terlambat ${lateDays} hari`, countdownColor: '#B33941', isLate: true };
+    return { dueText, countdownText: `Terlambat ${Math.abs(diffDays)} hari`, urgency: 'late' };
   }
-  if (diffDays === 0) return { dueText, countdownText: 'Hari ini!', countdownColor: '#B33941', isLate: false };
-  if (diffDays <= 2) return { dueText, countdownText: `${diffDays} hari lagi`, countdownColor: '#B33941', isLate: false };
-  if (diffDays <= 7) return { dueText, countdownText: `${diffDays} hari lagi`, countdownColor: '#DE8F26', isLate: false };
-  return { dueText, countdownText: `${diffDays} hari lagi`, countdownColor: '#9CA3AF', isLate: false };
+  if (diffDays === 0) return { dueText, countdownText: 'Hari ini!', urgency: 'critical' };
+  if (diffDays <= 2)  return { dueText, countdownText: `${diffDays} hari lagi`, urgency: 'critical' };
+  if (diffDays <= 7)  return { dueText, countdownText: `${diffDays} hari lagi`, urgency: 'warning' };
+  if (diffDays <= 14) return { dueText, countdownText: `${diffDays} hari lagi`, urgency: 'soon' };
+  return { dueText, countdownText: `${diffDays} hari lagi`, urgency: 'safe' };
 }
 
-// ─── WorkerItemSummaryCard ─────────────────────────────────────────────────────────────────
+// ─── WorkerItemSummaryCard ────────────────────────────────────────────────────
 
 function WorkerItemSummaryCard({
   item,
@@ -102,10 +116,8 @@ function WorkerItemSummaryCard({
   const startTimerRef = useRef<((prev: number) => void) | null>(null);
   const cardRef = useRef<HTMLDivElement>(null);
 
-  // Sync local when saved value changes externally
   useEffect(() => { setLocalProgress(item.progress); }, [item.progress]);
 
-  // Auto-scroll card to top of viewport when expanded
   useEffect(() => {
     if (expanded) {
       const t = setTimeout(() => {
@@ -115,7 +127,6 @@ function WorkerItemSummaryCard({
     }
   }, [expanded]);
 
-  // State 1 condition: local has unsaved change
   const hasUnsaved = localProgress !== item.progress;
 
   function handleSave() {
@@ -133,7 +144,8 @@ function WorkerItemSummaryCard({
 
   function handleUndo() { setLocalProgress(item.progress); }
 
-  const { dueText, countdownText, countdownColor, isLate } = getDueDateMeta(item.po.deliveryDate);
+  const { dueText, countdownText, urgency } = getDueDateMeta(item.po.deliveryDate);
+  const countdownColor = URGENCY_COLOR[urgency];
   const overall = overallProgress(item);
 
   return (
@@ -152,23 +164,30 @@ function WorkerItemSummaryCard({
           }
         </div>
 
-        {/* Customer · qty · due date · countdown */}
+        {/* Customer · QTY (big+bold) · due date · countdown (colorized) */}
         <p className="text-[13px] mt-1 flex flex-wrap items-center gap-x-1">
           <span className="font-medium text-[#1A1A2E]">{item.po.clientName}</span>
           <span className="text-[#9CA3AF]">·</span>
-          <span className="text-[#6B7280]">{item.qty} pcs</span>
+          {/* QTY — bigger and bold */}
+          <span className="text-[15px] font-bold text-[#1A1A2E]">{item.qty} pcs</span>
           <span className="text-[#9CA3AF]">·</span>
           <span className="text-[#6B7280]">{dueText}</span>
           <span className="text-[#9CA3AF]">·</span>
+          {/* Countdown — colorized + blink if late */}
           <span
             style={{ color: countdownColor }}
-            className={isLate ? 'font-semibold' : 'font-medium'}
+            className={[
+              urgency === 'late' ? 'font-bold animate-pulse' : '',
+              urgency === 'critical' ? 'font-semibold' : '',
+              urgency === 'warning' ? 'font-medium' : '',
+              urgency === 'soon' || urgency === 'safe' ? 'font-normal' : '',
+            ].filter(Boolean).join(' ')}
           >
             {countdownText}
           </span>
         </p>
 
-        {/* Stage breakdown — full stage names, percentage format */}
+        {/* Stage breakdown */}
         <p className="text-[12px] text-[#9CA3AF] mt-1 leading-relaxed">
           {formatStageBreakdown(item)}
         </p>
@@ -243,7 +262,7 @@ function WorkerItemSummaryCard({
   );
 }
 
-// ─── Main Page ────────────────────────────────────────────────────────────────────────────
+// ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function JobsPage() {
   const hasHydrated    = useUIStore((s) => s._hasHydrated);
