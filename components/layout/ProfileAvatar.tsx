@@ -15,7 +15,7 @@ function getInitials(name: string): string {
   return first + last;
 }
 
-// ─── PIN Change Mini-Flow ────────────────────────────────────────────
+// ─── PIN Change Mini-Flow ────────────────────────────────────────────────────
 type PinStep = 'idle' | 'old' | 'new' | 'confirm';
 
 function PinPad({ value, onChange }: { value: string; onChange: (v: string) => void }) {
@@ -101,20 +101,20 @@ function ProfileDrawer({ onClose }: { onClose: () => void }) {
 
   return (
     <>
-      {/* Backdrop — tap to dismiss */}
+      {/* Backdrop */}
       <div
         className="fixed inset-0 bg-black/40 z-40"
         onClick={onClose}
         aria-hidden="true"
       />
 
-      {/* Left-side drawer — full height, not blocked by navbar */}
+      {/* Left drawer — top-0 to bottom-0, not clipped by navbar */}
       <div
-        className="fixed top-0 left-0 bottom-0 z-50 bg-white shadow-xl flex flex-col animate-slide-in-left"
+        className="fixed top-0 left-0 bottom-0 z-50 bg-white shadow-2xl flex flex-col animate-slide-in-left"
         style={{ width: '80vw', maxWidth: 320 }}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-[#E5E7EB] flex-shrink-0">
+        <div className="flex items-center justify-between px-4 border-b border-[#E5E7EB] flex-shrink-0" style={{ paddingTop: 'max(env(safe-area-inset-top, 0px), 16px)', paddingBottom: 12 }}>
           <span className="text-base font-semibold text-[#1A1A2E]">Profil</span>
           <button
             type="button"
@@ -196,15 +196,15 @@ function ProfileDrawer({ onClose }: { onClose: () => void }) {
           )}
         </div>
 
-        {/* Keluar — pinned to bottom, safe area aware */}
+        {/* Keluar — pinned to bottom, clears navbar + safe area */}
         <div
-          className="px-4 pt-2 flex-shrink-0 border-t border-[#F3F4F6]"
-          style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 16px)' }}
+          className="px-4 pt-3 flex-shrink-0 border-t border-[#F3F4F6]"
+          style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 80px)' }}
         >
           <button
             type="button"
             onClick={handleLogout}
-            className="w-full flex items-center justify-center gap-2 min-h-[48px] rounded-xl border border-[#FECACA] text-sm font-medium text-[#B33941]"
+            className="w-full flex items-center justify-center gap-2 min-h-[48px] rounded-xl border border-[#FECACA] text-sm font-medium text-[#B33941] active:bg-[#FEF2F2] transition-colors"
           >
             <LogOut size={16} />
             Keluar
