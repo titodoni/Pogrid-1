@@ -62,8 +62,6 @@ export default function BoardPage() {
   const toggleBoardFilter = useUIStore((s) => s.toggleBoardFilter);
   const setBoardFilters   = useUIStore((s) => s.setBoardFilters);
 
-  // ── All derived values must be computed unconditionally (above early return)
-  // so hooks are always called in the same order every render.
   const nowMs = useMemo(() => Date.now(), []);
   const today = useMemo(() => new Date(), []);
 
@@ -73,7 +71,7 @@ export default function BoardPage() {
   );
 
   const activePOIds = useMemo(
-    () => [...new Set(activeItems.map((i) => i.poId))],
+    () => Array.from(new Set(activeItems.map((i) => i.poId))),
     [activeItems]
   );
 
