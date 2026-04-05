@@ -111,6 +111,7 @@ export default function ItemCard({
           <div className="flex justify-between items-center">
             <BatalkanControl
               itemId={item.id}
+              hasUnsaved={hasUnsaved}
               onUndo={handleUndo}
               onStartTimer={(fn) => { startTimerRef.current = fn; }}
             />
