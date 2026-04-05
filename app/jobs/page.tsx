@@ -53,13 +53,12 @@ function formatStageBreakdown(item: MockItem): string {
   }).join(' · ');
 }
 
-// ─── Due Date Meta ────────────────────────────────────────────────────────────
-// urgency levels:
-//   'late'     → already past due      → red  + blink
-//   'critical' → today or ≤ 2 days     → red
-//   'warning'  → 3–7 days              → orange
-//   'soon'     → 8–14 days             → yellow-ish
-//   'safe'     → > 14 days             → gray/green
+// Format updatedAt → "3 Jun"
+function formatShortDate(iso: string): string {
+  return new Date(iso).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' });
+}
+
+// ─── Due Date Meta ─────────────────────────────────────────────────────────────
 
 type Urgency = 'late' | 'critical' | 'warning' | 'soon' | 'safe';
 
@@ -70,11 +69,11 @@ interface DueDateMeta {
 }
 
 const URGENCY_COLOR: Record<Urgency, string> = {
-  late:     '#B33941', // red
-  critical: '#B33941', // red
-  warning:  '#DE8F26', // orange
-  soon:     '#B08B00', // amber
-  safe:     '#4A9B6F', // green
+  late:     '#B33941',
+  critical: '#B33941',
+  warning:  '#DE8F26',
+  soon:     '#B08B00',
+  safe:     '#4A9B6F',
 };
 
 function getDueDateMeta(deliveryDate: string): DueDateMeta {
@@ -83,12 +82,9 @@ function getDueDateMeta(deliveryDate: string): DueDateMeta {
   const due = new Date(deliveryDate);
   due.setHours(0, 0, 0, 0);
   const diffDays = Math.round((due.getTime() - now.getTime()) / 86400000);
-
   const dueText = `Due ${due.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })}`;
 
-  if (diffDays < 0) {
-    return { dueText, countdownText: `Terlambat ${Math.abs(diffDays)} hari`, urgency: 'late' };
-  }
+  if (diffDays < 0)  return { dueText, countdownText: `Terlambat ${Math.abs(diffDays)} hari`, urgency: 'late' };
   if (diffDays === 0) return { dueText, countdownText: 'Hari ini!', urgency: 'critical' };
   if (diffDays <= 2)  return { dueText, countdownText: `${diffDays} hari lagi`, urgency: 'critical' };
   if (diffDays <= 7)  return { dueText, countdownText: `${diffDays} hari lagi`, urgency: 'warning' };
@@ -96,7 +92,7 @@ function getDueDateMeta(deliveryDate: string): DueDateMeta {
   return { dueText, countdownText: `${diffDays} hari lagi`, urgency: 'safe' };
 }
 
-// ─── WorkerItemSummaryCard ────────────────────────────────────────────────────
+// ─── WorkerItemSummaryCard ─────────────────────────────────────────────────────
 
 function WorkerItemSummaryCard({
   item,
@@ -148,15 +144,25 @@ function WorkerItemSummaryCard({
   const countdownColor = URGENCY_COLOR[urgency];
   const overall = overallProgress(item);
 
+  // Latest update progress display: "50% → MACHINING · 3 Jun"
+  const latestProgressPct = item.qty === 1
+    ? `${item.progress}%`
+    : `${item.progress}/${item.qty}`;
+  const latestUpdateText = `${latestProgressPct} → ${item.stage} · ${formatShortDate(item.updatedAt)}`;
+
   return (
     <div
       ref={cardRef}
       className="bg-white rounded-xl border border-[#E5E7EB] mb-3 overflow-hidden scroll-mt-36"
     >
       <button type="button" onClick={onToggle} className="w-full text-left p-4">
+
+        {/* Row 1 — Item name (bold) + PO number (normal) + overall % or badge */}
         <div className="flex justify-between items-start">
-          <span className="text-[18px] font-bold text-[#1A1A2E] flex-1 pr-2 leading-snug">
-            {item.name}
+          <span className="text-[17px] leading-snug flex-1 pr-2">
+            <span className="font-bold text-[#1A1A2E]">{item.name}</span>
+            {' '}
+            <span className="font-normal text-[#6B7280] text-[14px]">({item.po.number})</span>
           </span>
           {item.issues.some((i) => !i.resolved)
             ? <StageBadge item={item} />
@@ -164,41 +170,44 @@ function WorkerItemSummaryCard({
           }
         </div>
 
-        {/* Customer · QTY (big+bold) · due date · countdown (colorized) */}
+        {/* Row 2 — Customer · QTY · due · countdown */}
         <p className="text-[13px] mt-1 flex flex-wrap items-center gap-x-1">
           <span className="font-medium text-[#1A1A2E]">{item.po.clientName}</span>
           <span className="text-[#9CA3AF]">·</span>
-          {/* QTY — bigger and bold */}
           <span className="text-[15px] font-bold text-[#1A1A2E]">{item.qty} pcs</span>
           <span className="text-[#9CA3AF]">·</span>
           <span className="text-[#6B7280]">{dueText}</span>
           <span className="text-[#9CA3AF]">·</span>
-          {/* Countdown — colorized + blink if late */}
           <span
             style={{ color: countdownColor }}
             className={[
-              urgency === 'late' ? 'font-bold animate-pulse' : '',
+              urgency === 'late'     ? 'font-bold animate-pulse' : '',
               urgency === 'critical' ? 'font-semibold' : '',
-              urgency === 'warning' ? 'font-medium' : '',
-              urgency === 'soon' || urgency === 'safe' ? 'font-normal' : '',
+              urgency === 'warning'  ? 'font-medium' : '',
+              (urgency === 'soon' || urgency === 'safe') ? 'font-normal' : '',
             ].filter(Boolean).join(' ')}
           >
             {countdownText}
           </span>
         </p>
 
-        {/* Stage breakdown */}
+        {/* Row 3 — Stage breakdown */}
         <p className="text-[12px] text-[#9CA3AF] mt-1 leading-relaxed">
           {formatStageBreakdown(item)}
         </p>
 
+        {/* Row 4 — Progress bar */}
         <div className="mt-2 h-1.5 rounded-full bg-[#E5E7EB]">
           <div className="h-1.5 rounded-full bg-[#2A7B76]" style={{ width: `${overall}%` }} />
         </div>
+
+        {/* Row 5 — Latest update: "50% → MACHINING · 3 Jun" */}
         <div className="flex justify-between items-center mt-2">
           <span className="text-[12px] text-[#9CA3AF]">{item.lastEventLabel} · {item.lastEventTime}</span>
-          <span className="text-[12px] text-[#2A7B76]">{item.stage} → {item.qty === 1 ? `${item.progress}%` : `${item.progress}/${item.qty}`}</span>
+          <span className="text-[12px] font-medium text-[#2A7B76]">{latestUpdateText}</span>
         </div>
+
+        {/* Row 6 — Pills */}
         <div className="flex gap-1 flex-wrap mt-2">
           <ReworkPill parentItemId={item.parentItemId} parentName={item.parent?.name} />
           <ReturnPill source={item.source} returnBreadcrumb={item.returnBreadcrumb} />
@@ -262,12 +271,12 @@ function WorkerItemSummaryCard({
   );
 }
 
-// ─── Main Page ────────────────────────────────────────────────────────────────
+// ─── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function JobsPage() {
-  const hasHydrated    = useUIStore((s) => s._hasHydrated);
-  const session        = useUIStore((s) => s.session);
-  const expandedItemId = useUIStore((s) => s.expandedItemId);
+  const hasHydrated       = useUIStore((s) => s._hasHydrated);
+  const session           = useUIStore((s) => s.session);
+  const expandedItemId    = useUIStore((s) => s.expandedItemId);
   const setExpandedItemId = useUIStore((s) => s.setExpandedItemId);
   const selectedSegment   = useUIStore((s) => s.selectedSegment);
   const setSelectedSegment = useUIStore((s) => s.setSelectedSegment);
