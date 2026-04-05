@@ -22,37 +22,30 @@ function formatMonth(ym: string): string {
   const d = new Date(Number(y), Number(m) - 1);
   return d.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
 }
-
 function prevMonth(ym: string): string {
   const [y, m] = ym.split('-').map(Number);
   const d = new Date(y, m - 2);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
-
 function nextMonth(ym: string): string {
   const [y, m] = ym.split('-').map(Number);
   const d = new Date(y, m);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
-
 function overallProgress(item: MockItem): number {
   if (item.stageBreakdown.length === 0) return 0;
   const total = item.stageBreakdown.reduce((s, b) => s + b.progress, 0);
   const maxTotal = item.stageBreakdown.length * 100;
   return maxTotal === 0 ? 0 : Math.round((total / maxTotal) * 100);
 }
-
 function formatStageBreakdown(item: MockItem): string {
   return item.stageBreakdown.map((b) => {
     const pct = b.stage === item.stage
-      ? (item.qty === 1
-          ? item.progress
-          : Math.round((item.progress / item.qty) * 100))
+      ? (item.qty === 1 ? item.progress : Math.round((item.progress / item.qty) * 100))
       : b.progress;
     return `${b.stage} ${pct}%`;
   }).join(' · ');
 }
-
 function formatShortDate(iso: string): string {
   return new Date(iso).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' });
 }
@@ -60,29 +53,15 @@ function formatShortDate(iso: string): string {
 // ─── Due Date Meta ────────────────────────────────────────────────────────────
 
 type Urgency = 'late' | 'critical' | 'warning' | 'soon' | 'safe';
-
-interface DueDateMeta {
-  dueText: string;
-  countdownText: string;
-  urgency: Urgency;
-}
-
+interface DueDateMeta { dueText: string; countdownText: string; urgency: Urgency; }
 const URGENCY_COLOR: Record<Urgency, string> = {
-  late:     '#B33941',
-  critical: '#B33941',
-  warning:  '#DE8F26',
-  soon:     '#B08B00',
-  safe:     '#4A9B6F',
+  late: '#B33941', critical: '#B33941', warning: '#DE8F26', soon: '#B08B00', safe: '#4A9B6F',
 };
-
 function getDueDateMeta(deliveryDate: string): DueDateMeta {
-  const now = new Date();
-  now.setHours(0, 0, 0, 0);
-  const due = new Date(deliveryDate);
-  due.setHours(0, 0, 0, 0);
+  const now = new Date(); now.setHours(0, 0, 0, 0);
+  const due = new Date(deliveryDate); due.setHours(0, 0, 0, 0);
   const diffDays = Math.round((due.getTime() - now.getTime()) / 86400000);
   const dueText = `Due ${due.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })}`;
-
   if (diffDays < 0)   return { dueText, countdownText: `Terlambat ${Math.abs(diffDays)} hari`, urgency: 'late' };
   if (diffDays === 0) return { dueText, countdownText: 'Hari ini!', urgency: 'critical' };
   if (diffDays <= 2)  return { dueText, countdownText: `${diffDays} hari lagi`, urgency: 'critical' };
@@ -90,6 +69,10 @@ function getDueDateMeta(deliveryDate: string): DueDateMeta {
   if (diffDays <= 14) return { dueText, countdownText: `${diffDays} hari lagi`, urgency: 'soon' };
   return { dueText, countdownText: `${diffDays} hari lagi`, urgency: 'safe' };
 }
+
+// ─── Gate Entry Types ────────────────────────────────────────────────────────────
+// Phase 2: swap these mock mutations to open gate sheets
+type GateType = 'DELIVERY_CONFIRM' | 'QC_PASS' | 'QC_NG';
 
 // ─── WorkerItemSummaryCard ─────────────────────────────────────────────────────
 
@@ -99,23 +82,24 @@ function WorkerItemSummaryCard({
   expanded,
   onToggle,
   onSave,
+  onMockMutated,
 }: {
   item: MockItem;
   isOwnerStage: boolean;
   expanded: boolean;
   onToggle: () => void;
   onSave: (itemId: string, newProgress: number, previousProgress: number) => void;
+  onMockMutated: () => void; // triggers re-render in parent after mock mutation
 }) {
   const openBottomSheet = useUIStore((s) => s.openBottomSheet);
   const [localProgress, setLocalProgress] = useState(item.progress);
+  const [exiting, setExiting] = useState(false);
   const startTimerRef = useRef<((prev: number) => void) | null>(null);
   const cardRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => { setLocalProgress(item.progress); }, [item.progress]);
 
-  // FIX 6: scroll card top into view when THIS card transitions collapsed → expanded.
-  // scroll-mt-16 (64px) on the card accounts for the sticky header height.
-  // Only fires on expand (expanded === true), not on collapse.
+  // FIX 6: scroll into view on expand, 64px offset for sticky header
   useEffect(() => {
     if (!expanded) return;
     const t = setTimeout(() => {
@@ -125,6 +109,72 @@ function WorkerItemSummaryCard({
   }, [expanded]);
 
   const hasUnsaved = localProgress !== item.progress;
+
+  // ─── Gate Entry Handler ────────────────────────────────────────────
+  // Phase 2: replace mock block with openBottomSheet call
+  function handleGateEntry(type: GateType) {
+    if (exiting) return;
+    setExiting(true);
+    setTimeout(() => {
+      const now = new Date().toISOString();
+      if (type === 'DELIVERY_CONFIRM') {
+        // Phase 2: openBottomSheet('delivery-gate', item.id)
+        item.stage = 'DONE';
+        item.progress = 100;
+        item.updatedAt = now;
+        item.lastEventLabel = 'Terkirim';
+        item.lastEventTime = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+      } else if (type === 'QC_PASS') {
+        // Phase 2: openBottomSheet('qc-gate', item.id) with Path A
+        item.stage = 'DELIVERY';
+        item.progress = 0;
+        item.updatedAt = now;
+        item.lastEventLabel = 'Lulus QC';
+        item.lastEventTime = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+        // Update stageBreakdown QC to 100
+        const qcBreak = item.stageBreakdown.find((b) => b.stage === 'QC');
+        if (qcBreak) qcBreak.progress = 100;
+      } else if (type === 'QC_NG') {
+        // Phase 2: openBottomSheet('qc-gate', item.id) with Path B (ngQty=1 forced)
+        item.allNG = true;
+        item.updatedAt = now;
+        item.lastEventLabel = 'Semua unit gagal QC';
+        item.lastEventTime = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+        // Spawn RW child
+        const rwCount = mockItems.filter(
+          (i) => i.parentItemId === item.id
+        ).length;
+        const rwItem: MockItem = {
+          id: `${item.id}-rw${rwCount + 1}`,
+          poId: item.poId,
+          po: { ...item.po },
+          name: `${item.name} - RW${rwCount + 1}`,
+          qty: 1,
+          progress: 0,
+          stage: 'QC',
+          productionType: item.productionType,
+          vendorJob: item.vendorJob,
+          urgent: item.urgent,
+          allNG: false,
+          parentItemId: item.id,
+          parent: { name: item.name },
+          source: null,
+          returnBreadcrumb: null,
+          invoiceStatus: item.invoiceStatus,
+          notes: null,
+          createdAt: now,
+          updatedAt: now,
+          lastEventLabel: 'Item rework dibuat',
+          lastEventTime: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
+          issues: [],
+          stageBreakdown: [{ stage: 'QC', progress: 0, isStalled: false }],
+        };
+        mockItems.push(rwItem);
+      }
+      setExiting(false);
+      onMockMutated();
+    }, 250);
+  }
 
   function handleSave() {
     const previous = item.progress;
@@ -144,24 +194,124 @@ function WorkerItemSummaryCard({
   const { dueText, countdownText, urgency } = getDueDateMeta(item.po.deliveryDate);
   const countdownColor = URGENCY_COLOR[urgency];
   const overall = overallProgress(item);
-
-  const latestProgressPct = item.qty === 1
-    ? `${item.progress}%`
-    : `${item.progress}/${item.qty}`;
+  const latestProgressPct = item.qty === 1 ? `${item.progress}%` : `${item.progress}/${item.qty}`;
   const latestUpdateText = `${latestProgressPct} → ${item.stage} · ${formatShortDate(item.updatedAt)}`;
 
+  // ─── Decision table: what control to render ────────────────────────────────────
+  // QC + qty=1   → Case B: NG + G buttons
+  // DELIVERY + qty=1 → Case A: Terkirim button
+  // any + qty>1  → StepperControl
+  // other + qty=1 → ProgressSlider
+  const isBinaryQC       = item.stage === 'QC' && item.qty === 1;
+  const isBinaryDelivery = item.stage === 'DELIVERY' && item.qty === 1;
+  const isBinary         = isBinaryQC || isBinaryDelivery;
+
+  function renderTaskPanel() {
+    if (item.allNG) {
+      return <p className="text-[13px] text-[#B33941] font-medium">Semua unit gagal QC</p>;
+    }
+    if (!isOwnerStage) {
+      return <p className="text-sm text-[#6B7280]">Read-only — bukan stage kamu</p>;
+    }
+
+    // Case A: DELIVERY, qty = 1
+    if (isBinaryDelivery) {
+      return (
+        <button
+          type="button"
+          onClick={() => handleGateEntry('DELIVERY_CONFIRM')}
+          disabled={exiting}
+          className="w-full rounded-xl text-white text-[14px] font-medium"
+          style={{ minHeight: 56, background: '#2A7B76' }}
+        >
+          ✅ Terkirim
+        </button>
+      );
+    }
+
+    // Case B: QC, qty = 1
+    if (isBinaryQC) {
+      return (
+        <div className="flex gap-3">
+          <button
+            type="button"
+            onClick={() => handleGateEntry('QC_NG')}
+            disabled={exiting}
+            className="flex-1 rounded-xl text-[14px] font-medium bg-white"
+            style={{
+              minHeight: 56,
+              border: '1.5px solid #B33941',
+              color: '#B33941',
+            }}
+          >
+            ❌ NG
+          </button>
+          <button
+            type="button"
+            onClick={() => handleGateEntry('QC_PASS')}
+            disabled={exiting}
+            className="flex-1 rounded-xl text-white text-[14px] font-medium"
+            style={{ minHeight: 56, background: '#2A7B76' }}
+          >
+            ✅ G
+          </button>
+        </div>
+      );
+    }
+
+    // Standard: qty > 1 → stepper; qty = 1 other stages → slider
+    return item.qty === 1
+      ? <ProgressSlider value={localProgress} onChange={setLocalProgress} />
+      : <StepperControl current={localProgress} max={item.qty} onChange={setLocalProgress} />;
+  }
+
+  // Show Batalkan + Simpan only for non-binary interactive controls
+  function renderActionFooter() {
+    if (item.allNG || !isOwnerStage || isBinary) return null;
+    return (
+      <div className="flex justify-between items-center mt-3">
+        <BatalkanControl
+          itemId={item.id}
+          hasUnsaved={hasUnsaved}
+          onUndo={handleUndo}
+          onStartTimer={(fn) => { startTimerRef.current = fn; }}
+        />
+        {hasUnsaved ? (
+          <button
+            type="button"
+            onClick={handleSave}
+            className="rounded-lg px-4 h-10 text-sm font-medium text-white"
+            style={{ background: '#2A7B76' }}
+          >
+            Simpan
+          </button>
+        ) : (
+          <button
+            type="button"
+            className="text-sm font-medium px-2"
+            style={{ color: '#B33941' }}
+            onClick={() => useUIStore.getState().openBottomSheet('issue', item.id)}
+          >
+            🚩 Laporkan
+          </button>
+        )}
+      </div>
+    );
+  }
+
   return (
-    // FIX 6: scroll-mt-16 = 64px offset so sticky header (56px) doesn't overlap the card top
     <div
       ref={cardRef}
       className="bg-white rounded-xl border border-[#E5E7EB] mb-3 overflow-hidden scroll-mt-16"
+      style={{
+        opacity: exiting ? 0 : 1,
+        transition: 'opacity 250ms ease-out',
+      }}
     >
       <button type="button" onClick={onToggle} className="w-full text-left p-4">
-
-        {/* Row 1 — Item name (18px bold) + PO number (14px muted) + badge/% */}
+        {/* Row 1: Item name (18px bold) + PO number + badge */}
         <div className="flex justify-between items-start">
           <span className="flex-1 pr-2 leading-snug">
-            {/* FIX 5: item name 18px 700 #1A1A2E — most dominant text on card */}
             <span className="text-[18px] font-bold text-[#1A1A2E]">{item.name}</span>
             {' '}
             <span className="text-[13px] font-normal text-[#9CA3AF]">({item.po.number})</span>
@@ -172,13 +322,10 @@ function WorkerItemSummaryCard({
           }
         </div>
 
-        {/* Row 2 — Customer name: own dedicated line, 13px 400 muted — required context */}
-        {/* FIX 5: customer name separated here, not mixed into qty/due row */}
-        <p className="text-[13px] font-normal text-[#6B7280] mt-0.5">
-          {item.po.clientName}
-        </p>
+        {/* Row 2: Customer name */}
+        <p className="text-[13px] font-normal text-[#6B7280] mt-0.5">{item.po.clientName}</p>
 
-        {/* Row 3 — QTY (bold) · due date · countdown (colorized) */}
+        {/* Row 3: QTY · due · countdown */}
         <p className="text-[13px] mt-1 flex flex-wrap items-center gap-x-1">
           <span className="text-[15px] font-bold text-[#1A1A2E]">{item.qty} pcs</span>
           <span className="text-[#9CA3AF]">·</span>
@@ -197,23 +344,23 @@ function WorkerItemSummaryCard({
           </span>
         </p>
 
-        {/* Row 4 — Stage breakdown */}
+        {/* Row 4: Stage breakdown */}
         <p className="text-[12px] text-[#9CA3AF] mt-1 leading-relaxed">
           {formatStageBreakdown(item)}
         </p>
 
-        {/* Row 5 — Progress bar */}
+        {/* Row 5: Progress bar */}
         <div className="mt-2 h-1.5 rounded-full bg-[#E5E7EB]">
           <div className="h-1.5 rounded-full bg-[#2A7B76]" style={{ width: `${overall}%` }} />
         </div>
 
-        {/* Row 6 — Last event (left) + latest progress update (right) */}
+        {/* Row 6: Last event + latest progress update */}
         <div className="flex justify-between items-center mt-2">
           <span className="text-[12px] text-[#9CA3AF]">{item.lastEventLabel} · {item.lastEventTime}</span>
           <span className="text-[12px] font-medium text-[#2A7B76]">{latestUpdateText}</span>
         </div>
 
-        {/* Row 7 — Pills */}
+        {/* Row 7: Pills */}
         <div className="flex gap-1 flex-wrap mt-2">
           <ReworkPill parentItemId={item.parentItemId} parentName={item.parent?.name} />
           <ReturnPill source={item.source} returnBreadcrumb={item.returnBreadcrumb} />
@@ -223,49 +370,16 @@ function WorkerItemSummaryCard({
       </button>
 
       {expanded && (
-        <div className="px-4 pb-4 border-t border-[#E5E7EB] animate-fade-in">
-          <p className="text-sm font-semibold text-[#1D3B4D] mt-4 mb-2">UPDATE · {item.stage}</p>
-          {item.allNG ? (
-            <p className="text-[13px] text-[#B33941] font-medium">Semua unit gagal QC</p>
-          ) : isOwnerStage ? (
-            item.qty === 1
-              ? <ProgressSlider value={localProgress} onChange={setLocalProgress} />
-              : <StepperControl current={localProgress} max={item.qty} onChange={setLocalProgress} />
-          ) : (
-            <p className="text-sm text-[#6B7280]">Read-only — bukan stage kamu</p>
-          )}
-          {isOwnerStage && !item.allNG && (
-            <div className="flex justify-between items-center mt-3">
-              <BatalkanControl
-                itemId={item.id}
-                hasUnsaved={hasUnsaved}
-                onUndo={handleUndo}
-                onStartTimer={(fn) => { startTimerRef.current = fn; }}
-              />
-              {hasUnsaved && (
-                <button
-                  type="button"
-                  onClick={handleSave}
-                  className="rounded-lg px-4 h-10 text-sm font-medium bg-[#2A7B76] text-white"
-                >
-                  Simpan
-                </button>
-              )}
-              {!hasUnsaved && (
-                <button
-                  type="button"
-                  className="text-[#B33941] text-sm font-medium px-2"
-                  onClick={() => useUIStore.getState().openBottomSheet('issue', item.id)}
-                >
-                  🚩 Laporkan
-                </button>
-              )}
-            </div>
-          )}
-          {!isOwnerStage && (
+        <div className="px-4 pb-4 border-t border-[#E5E7EB]">
+          <p className="text-sm font-semibold text-[#1D3B4D] mt-4 mb-3">UPDATE · {item.stage}</p>
+          {renderTaskPanel()}
+          {renderActionFooter()}
+          {/* Laporkan Masalah — always visible for non-owner or binary-stage */}
+          {(!isOwnerStage || (isBinary && !item.allNG)) && (
             <button
               type="button"
-              className="mt-2 text-[#B33941] text-sm font-medium"
+              className="mt-3 text-sm font-medium"
+              style={{ color: '#B33941' }}
               onClick={() => useUIStore.getState().openBottomSheet('issue', item.id)}
             >
               + Laporkan Masalah
@@ -293,9 +407,14 @@ export default function JobsPage() {
 
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [debouncedSearch, setDebouncedSearch] = useState(searchQuery);
+  // forceUpdate counter: increment to trigger re-render after mock mutation
+  const [mutationTick, setMutationTick] = useState(0);
+  const handleMockMutated = useCallback(() => {
+    setMutationTick((n) => n + 1);
+    setExpandedItemId(null);
+  }, [setExpandedItemId]);
 
   const handleToggle = useCallback((id: string) => {
-    // Only one card expanded at a time — collapse previous, expand new
     setExpandedItemId(expandedItemId === id ? null : id);
   }, [expandedItemId, setExpandedItemId]);
 
@@ -332,7 +451,8 @@ export default function JobsPage() {
 
   const dept = session.department.toUpperCase();
 
-  const filtered = mockItems.filter((item) => {
+  // mutationTick in dep array so filtered re-evaluates after mock mutations
+  const filtered = React.useMemo(() => mockItems.filter((item) => {
     if (item.stage !== dept) return false;
     if (selectedSegment === 'active' && item.allNG) return false;
     if (selectedSegment === 'archive' && !item.allNG && item.stage !== 'DONE') return false;
@@ -349,7 +469,8 @@ export default function JobsPage() {
       if (!match) return false;
     }
     return true;
-  });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [dept, selectedSegment, selectedMonth, debouncedSearch, mutationTick]);
 
   const sorted = [...filtered].sort((a, b) => {
     if (selectedSegment === 'active') {
@@ -445,6 +566,7 @@ export default function JobsPage() {
               expanded={expandedItemId === item.id}
               onToggle={() => handleToggle(item.id)}
               onSave={handleSave}
+              onMockMutated={handleMockMutated}
             />
           ))
         )}
