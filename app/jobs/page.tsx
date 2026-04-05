@@ -71,7 +71,6 @@ function getDueDateMeta(deliveryDate: string): DueDateMeta {
 }
 
 // ─── Gate Entry Types ─────────────────────────────────────────────────────────
-// Phase 2: swap mock mutations to open gate sheets
 type GateType = 'DELIVERY_CONFIRM' | 'QC_PASS' | 'QC_NG';
 
 // ─── WorkerItemSummaryCard ─────────────────────────────────────────────────────
@@ -99,7 +98,6 @@ function WorkerItemSummaryCard({
 
   useEffect(() => { setLocalProgress(item.progress); }, [item.progress]);
 
-  // FIX 6: auto-scroll on expand with 64px sticky-header offset
   useEffect(() => {
     if (!expanded) return;
     const t = setTimeout(() => {
@@ -110,8 +108,6 @@ function WorkerItemSummaryCard({
 
   const hasUnsaved = localProgress !== item.progress;
 
-  // ─── Gate Entry Handler ───────────────────────────────────────────────────
-  // Phase 2: replace mock block body with openBottomSheet call
   function handleGateEntry(type: GateType) {
     if (exiting) return;
     setExiting(true);
@@ -120,14 +116,12 @@ function WorkerItemSummaryCard({
       const timeStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
 
       if (type === 'DELIVERY_CONFIRM') {
-        // Phase 2: openBottomSheet('delivery-gate', item.id)
         item.stage = 'DONE';
         item.progress = 100;
         item.updatedAt = now;
         item.lastEventLabel = 'Terkirim';
         item.lastEventTime = timeStr;
       } else if (type === 'QC_PASS') {
-        // Phase 2: openBottomSheet('qc-gate', item.id) — Path A
         item.stage = 'DELIVERY';
         item.progress = 0;
         item.updatedAt = now;
@@ -136,7 +130,6 @@ function WorkerItemSummaryCard({
         const qcBreak = item.stageBreakdown.find((b) => b.stage === 'QC');
         if (qcBreak) qcBreak.progress = 100;
       } else if (type === 'QC_NG') {
-        // Phase 2: openBottomSheet('qc-gate', item.id) — Path B (ngQty=1 forced)
         item.allNG = true;
         item.updatedAt = now;
         item.lastEventLabel = 'Semua unit gagal QC';
@@ -196,7 +189,6 @@ function WorkerItemSummaryCard({
   const latestProgressPct = item.qty === 1 ? `${item.progress}%` : `${item.progress}/${item.qty}`;
   const latestUpdateText = `${latestProgressPct} → ${item.stage} · ${formatShortDate(item.updatedAt)}`;
 
-  // Decision table — FIX 5 (P1-FIX)
   const isBinaryQC       = item.stage === 'QC' && item.qty === 1;
   const isBinaryDelivery = item.stage === 'DELIVERY' && item.qty === 1;
   const isBinary         = isBinaryQC || isBinaryDelivery;
@@ -406,10 +398,9 @@ export default function JobsPage() {
     searchTimerRef.current = setTimeout(() => setDebouncedSearch(val), 300);
   }
 
-  // dept defaults to '' when session not yet ready — useMemo must be
-  // unconditional (above early return) to satisfy rules-of-hooks
   const dept = session?.department.toUpperCase() ?? '';
 
+  // ── All useMemo hooks unconditionally above early return ──────────────────
   const filtered = useMemo(() => {
     if (!dept) return [];
     return mockItems.filter((item) => {
@@ -430,6 +421,8 @@ export default function JobsPage() {
       }
       return true;
     });
+    // mutationTick forces re-evaluation when mock data is mutated in-place
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dept, selectedSegment, selectedMonth, debouncedSearch, mutationTick]);
 
   const sorted = useMemo(() => [...filtered].sort((a, b) => {
@@ -440,12 +433,14 @@ export default function JobsPage() {
     return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
   }), [filtered, selectedSegment]);
 
-  const activeCount  = useMemo(() =>
+  const activeCount = useMemo(() =>
     mockItems.filter((i) => i.stage === dept && !i.allNG).length,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   [dept, mutationTick]);
 
   const archiveCount = useMemo(() =>
     mockItems.filter((i) => i.stage === dept && (i.allNG || i.stage === 'DONE')).length,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   [dept, mutationTick]);
 
   // ─── Early return — BELOW all hooks ──────────────────────────────────────
