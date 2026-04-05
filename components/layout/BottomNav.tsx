@@ -48,11 +48,11 @@ function getTabsForRole(role: string): Tab[] {
       ];
     case 'manager':
       return [
-        { label: 'Papan',     route: '/board',     icon: LayoutGrid },
-        { label: 'PO',        route: '/pos',       icon: ClipboardList },
-        { label: 'Masalah',   route: '/issues',    icon: AlertTriangle },
-        { label: 'Analitik',  route: '/analytics', icon: BarChart2 },
-        { label: 'Ekspor',    route: '/export',    icon: FileDown },
+        { label: 'Papan',    route: '/board',     icon: LayoutGrid },
+        { label: 'PO',       route: '/pos',       icon: ClipboardList },
+        { label: 'Masalah',  route: '/issues',    icon: AlertTriangle },
+        { label: 'Analitik', route: '/analytics', icon: BarChart2 },
+        { label: 'Ekspor',   route: '/export',    icon: FileDown },
       ];
     case 'sales':
       return [
@@ -62,16 +62,16 @@ function getTabsForRole(role: string): Tab[] {
       ];
     case 'finance':
       return [
-        { label: 'Papan',     route: '/board',     icon: LayoutGrid },
-        { label: 'Tagihan',   route: '/invoicing', icon: DollarSign },
-        { label: 'PO',        route: '/pos',       icon: ClipboardList },
+        { label: 'Papan',   route: '/board',     icon: LayoutGrid },
+        { label: 'Tagihan', route: '/invoicing', icon: DollarSign },
+        { label: 'PO',      route: '/pos',       icon: ClipboardList },
       ];
     default:
       return [{ label: 'Papan', route: '/board', icon: LayoutGrid }];
   }
 }
 
-export function BottomNav({ role, department: _department }: BottomNavProps) {
+export function BottomNav({ role }: BottomNavProps) {
   const [currentPath, setCurrentPath] = useState('');
   const clearSession = useUIStore((s) => s.clearSession);
 
@@ -112,7 +112,6 @@ export function BottomNav({ role, department: _department }: BottomNavProps) {
           );
         })}
 
-        {/* Logout — only for worker, tappable icon at far right */}
         {role === 'worker' && (
           <button
             type="button"
