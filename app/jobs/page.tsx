@@ -15,7 +15,7 @@ import ProgressSlider from '@/components/ui/ProgressSlider';
 import StepperControl from '@/components/ui/StepperControl';
 import BatalkanControl from '@/components/ui/BatalkanControl';
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────────────────
 
 function formatMonth(ym: string): string {
   const [y, m] = ym.split('-');
@@ -42,6 +42,19 @@ function overallProgress(item: MockItem): number {
   return maxTotal === 0 ? 0 : Math.round((total / maxTotal) * 100);
 }
 
+// Stage breakdown display — full name, n% format for all segments
+// e.g. "DRAFTING 0% · MACHINING 57% · QC 0%"
+function formatStageBreakdown(item: MockItem): string {
+  return item.stageBreakdown.map((b) => {
+    const pct = b.stage === item.stage
+      ? (item.qty === 1
+          ? item.progress
+          : Math.round((item.progress / item.qty) * 100))
+      : b.progress;
+    return `${b.stage} ${pct}%`;
+  }).join(' · ');
+}
+
 interface DueDateMeta {
   dueText: string;
   countdownText: string;
@@ -61,26 +74,15 @@ function getDueDateMeta(deliveryDate: string): DueDateMeta {
 
   if (diffDays < 0) {
     const lateDays = Math.abs(diffDays);
-    return {
-      dueText,
-      countdownText: `Terlambat ${lateDays} hari`,
-      countdownColor: '#B33941',
-      isLate: true,
-    };
+    return { dueText, countdownText: `Terlambat ${lateDays} hari`, countdownColor: '#B33941', isLate: true };
   }
-  if (diffDays === 0) {
-    return { dueText, countdownText: 'Hari ini!', countdownColor: '#B33941', isLate: false };
-  }
-  if (diffDays <= 2) {
-    return { dueText, countdownText: `${diffDays} hari lagi`, countdownColor: '#B33941', isLate: false };
-  }
-  if (diffDays <= 7) {
-    return { dueText, countdownText: `${diffDays} hari lagi`, countdownColor: '#DE8F26', isLate: false };
-  }
+  if (diffDays === 0) return { dueText, countdownText: 'Hari ini!', countdownColor: '#B33941', isLate: false };
+  if (diffDays <= 2) return { dueText, countdownText: `${diffDays} hari lagi`, countdownColor: '#B33941', isLate: false };
+  if (diffDays <= 7) return { dueText, countdownText: `${diffDays} hari lagi`, countdownColor: '#DE8F26', isLate: false };
   return { dueText, countdownText: `${diffDays} hari lagi`, countdownColor: '#9CA3AF', isLate: false };
 }
 
-// ─── WorkerItemSummaryCard ─────────────────────────────────────────────────────
+// ─── WorkerItemSummaryCard ─────────────────────────────────────────────────────────────────
 
 function WorkerItemSummaryCard({
   item,
@@ -100,6 +102,7 @@ function WorkerItemSummaryCard({
   const startTimerRef = useRef<((prev: number) => void) | null>(null);
   const cardRef = useRef<HTMLDivElement>(null);
 
+  // Sync local when saved value changes externally
   useEffect(() => { setLocalProgress(item.progress); }, [item.progress]);
 
   // Auto-scroll card to top of viewport when expanded
@@ -111,6 +114,9 @@ function WorkerItemSummaryCard({
       return () => clearTimeout(t);
     }
   }, [expanded]);
+
+  // State 1 condition: local has unsaved change
+  const hasUnsaved = localProgress !== item.progress;
 
   function handleSave() {
     const previous = item.progress;
@@ -146,7 +152,7 @@ function WorkerItemSummaryCard({
           }
         </div>
 
-        {/* Customer · qty · due date absolute · countdown */}
+        {/* Customer · qty · due date · countdown */}
         <p className="text-[13px] mt-1 flex flex-wrap items-center gap-x-1">
           <span className="font-medium text-[#1A1A2E]">{item.po.clientName}</span>
           <span className="text-[#9CA3AF]">·</span>
@@ -162,11 +168,11 @@ function WorkerItemSummaryCard({
           </span>
         </p>
 
-        <p className="text-[12px] text-[#9CA3AF] mt-1">
-          {item.stageBreakdown.map((b) =>
-            `${b.stage.slice(0, 4)} ${b.stage === item.stage ? `${item.progress}/${item.qty}` : `${b.progress}%`}`
-          ).join(' · ')}
+        {/* Stage breakdown — full stage names, percentage format */}
+        <p className="text-[12px] text-[#9CA3AF] mt-1 leading-relaxed">
+          {formatStageBreakdown(item)}
         </p>
+
         <div className="mt-2 h-1.5 rounded-full bg-[#E5E7EB]">
           <div className="h-1.5 rounded-full bg-[#2A7B76]" style={{ width: `${overall}%` }} />
         </div>
@@ -198,32 +204,46 @@ function WorkerItemSummaryCard({
             <div className="flex justify-between items-center mt-3">
               <BatalkanControl
                 itemId={item.id}
+                hasUnsaved={hasUnsaved}
                 onUndo={handleUndo}
                 onStartTimer={(fn) => { startTimerRef.current = fn; }}
               />
-              <button
-                type="button"
-                onClick={handleSave}
-                className="rounded-lg px-4 h-10 text-sm font-medium bg-[#2A7B76] text-white"
-              >
-                Simpan
-              </button>
+              {hasUnsaved && (
+                <button
+                  type="button"
+                  onClick={handleSave}
+                  className="rounded-lg px-4 h-10 text-sm font-medium bg-[#2A7B76] text-white"
+                >
+                  Simpan
+                </button>
+              )}
+              {!hasUnsaved && (
+                <button
+                  type="button"
+                  className="text-[#B33941] text-sm font-medium px-2"
+                  onClick={() => useUIStore.getState().openBottomSheet('issue', item.id)}
+                >
+                  🚩 Laporkan
+                </button>
+              )}
             </div>
           )}
-          <button
-            type="button"
-            className="mt-2 text-[#B33941] text-sm font-medium"
-            onClick={() => useUIStore.getState().openBottomSheet('issue', item.id)}
-          >
-            + Laporkan Masalah
-          </button>
+          {!isOwnerStage && (
+            <button
+              type="button"
+              className="mt-2 text-[#B33941] text-sm font-medium"
+              onClick={() => useUIStore.getState().openBottomSheet('issue', item.id)}
+            >
+              + Laporkan Masalah
+            </button>
+          )}
         </div>
       )}
     </div>
   );
 }
 
-// ─── Main Page ────────────────────────────────────────────────────────────────
+// ─── Main Page ────────────────────────────────────────────────────────────────────────────
 
 export default function JobsPage() {
   const hasHydrated    = useUIStore((s) => s._hasHydrated);
