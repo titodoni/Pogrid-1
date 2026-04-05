@@ -42,6 +42,44 @@ function overallProgress(item: MockItem): number {
   return maxTotal === 0 ? 0 : Math.round((total / maxTotal) * 100);
 }
 
+interface DueDateMeta {
+  dueText: string;
+  countdownText: string;
+  countdownColor: string;
+  isLate: boolean;
+}
+
+function getDueDateMeta(deliveryDate: string): DueDateMeta {
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  const due = new Date(deliveryDate);
+  due.setHours(0, 0, 0, 0);
+  const diffMs = due.getTime() - now.getTime();
+  const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
+
+  const dueText = `Due ${due.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })}`;
+
+  if (diffDays < 0) {
+    const lateDays = Math.abs(diffDays);
+    return {
+      dueText,
+      countdownText: `Terlambat ${lateDays} hari`,
+      countdownColor: '#B33941',
+      isLate: true,
+    };
+  }
+  if (diffDays === 0) {
+    return { dueText, countdownText: 'Hari ini!', countdownColor: '#B33941', isLate: false };
+  }
+  if (diffDays <= 2) {
+    return { dueText, countdownText: `${diffDays} hari lagi`, countdownColor: '#B33941', isLate: false };
+  }
+  if (diffDays <= 7) {
+    return { dueText, countdownText: `${diffDays} hari lagi`, countdownColor: '#DE8F26', isLate: false };
+  }
+  return { dueText, countdownText: `${diffDays} hari lagi`, countdownColor: '#9CA3AF', isLate: false };
+}
+
 // ─── WorkerItemSummaryCard ─────────────────────────────────────────────────────
 
 function WorkerItemSummaryCard({
@@ -60,8 +98,19 @@ function WorkerItemSummaryCard({
   const openBottomSheet = useUIStore((s) => s.openBottomSheet);
   const [localProgress, setLocalProgress] = useState(item.progress);
   const startTimerRef = useRef<((prev: number) => void) | null>(null);
+  const cardRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => { setLocalProgress(item.progress); }, [item.progress]);
+
+  // Auto-scroll card to top of viewport when expanded
+  useEffect(() => {
+    if (expanded) {
+      const t = setTimeout(() => {
+        cardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 120);
+      return () => clearTimeout(t);
+    }
+  }, [expanded]);
 
   function handleSave() {
     const previous = item.progress;
@@ -78,25 +127,41 @@ function WorkerItemSummaryCard({
 
   function handleUndo() { setLocalProgress(item.progress); }
 
-  const isPastDue = new Date(item.po.deliveryDate) < new Date();
-  const dueDateStr = new Date(item.po.deliveryDate).toLocaleDateString('id-ID', {
-    day: 'numeric', month: 'short',
-  });
+  const { dueText, countdownText, countdownColor, isLate } = getDueDateMeta(item.po.deliveryDate);
   const overall = overallProgress(item);
 
   return (
-    <div className="bg-white rounded-xl border border-[#E5E7EB] mb-3 overflow-hidden">
+    <div
+      ref={cardRef}
+      className="bg-white rounded-xl border border-[#E5E7EB] mb-3 overflow-hidden scroll-mt-36"
+    >
       <button type="button" onClick={onToggle} className="w-full text-left p-4">
         <div className="flex justify-between items-start">
-          <span className="text-lg font-semibold text-[#1A1A2E] flex-1 pr-2">{item.name}</span>
+          <span className="text-[18px] font-bold text-[#1A1A2E] flex-1 pr-2 leading-snug">
+            {item.name}
+          </span>
           {item.issues.some((i) => !i.resolved)
             ? <StageBadge item={item} />
             : <span className="text-sm text-[#6B7280]">{overall}%</span>
           }
         </div>
-        <p className="text-[13px] mt-0.5" style={{ color: isPastDue ? '#B33941' : '#6B7280' }}>
-          {item.po.clientName} · {item.qty} pcs · Due {dueDateStr}{isPastDue && ' ⚠'}
+
+        {/* Customer · qty · due date absolute · countdown */}
+        <p className="text-[13px] mt-1 flex flex-wrap items-center gap-x-1">
+          <span className="font-medium text-[#1A1A2E]">{item.po.clientName}</span>
+          <span className="text-[#9CA3AF]">·</span>
+          <span className="text-[#6B7280]">{item.qty} pcs</span>
+          <span className="text-[#9CA3AF]">·</span>
+          <span className="text-[#6B7280]">{dueText}</span>
+          <span className="text-[#9CA3AF]">·</span>
+          <span
+            style={{ color: countdownColor }}
+            className={isLate ? 'font-semibold' : 'font-medium'}
+          >
+            {countdownText}
+          </span>
         </p>
+
         <p className="text-[12px] text-[#9CA3AF] mt-1">
           {item.stageBreakdown.map((b) =>
             `${b.stage.slice(0, 4)} ${b.stage === item.stage ? `${item.progress}/${item.qty}` : `${b.progress}%`}`
