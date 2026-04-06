@@ -50,6 +50,19 @@ function formatShortDate(iso: string): string {
   return new Date(iso).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' });
 }
 
+/** Natural-language progress for collapsed card */
+function formatNaturalProgress(item: MockItem): string {
+  if (item.qty === 1) {
+    if (item.progress === 0) return 'Belum mulai';
+    if (item.progress === 100) return 'Selesai 100%';
+    return `Selesai ${item.progress}%`;
+  }
+  const pct = Math.round((item.progress / item.qty) * 100);
+  if (item.progress === 0) return 'Belum mulai';
+  if (item.progress === item.qty) return `Selesai ${item.qty} dari ${item.qty} pcs`;
+  return `Selesai ${item.progress} dari ${item.qty} pcs · ${pct}%`;
+}
+
 // ─── Due Date Meta ────────────────────────────────────────────────────────────
 
 type Urgency = 'late' | 'critical' | 'warning' | 'soon' | 'safe';
@@ -186,8 +199,6 @@ function WorkerItemSummaryCard({
   const { dueText, countdownText, urgency } = getDueDateMeta(item.po.deliveryDate);
   const countdownColor = URGENCY_COLOR[urgency];
   const overall = overallProgress(item);
-  const latestProgressPct = item.qty === 1 ? `${item.progress}%` : `${item.progress}/${item.qty}`;
-  const latestUpdateText = `${latestProgressPct} → ${item.stage} · ${formatShortDate(item.updatedAt)}`;
 
   const isBinaryQC       = item.stage === 'QC' && item.qty === 1;
   const isBinaryDelivery = item.stage === 'DELIVERY' && item.qty === 1;
@@ -312,12 +323,15 @@ function WorkerItemSummaryCard({
           </span>
         </p>
         <p className="text-[12px] text-[#9CA3AF] mt-1 leading-relaxed">{formatStageBreakdown(item)}</p>
-        <div className="mt-2 h-1.5 rounded-full bg-[#E5E7EB]">
-          <div className="h-1.5 rounded-full bg-[#2A7B76]" style={{ width: `${overall}%` }} />
-        </div>
-        <div className="flex justify-between items-center mt-2">
+
+        {/* Natural-language progress — replaces mini progress bar */}
+        <p className="text-[13px] font-medium mt-2" style={{ color: '#2A7B76' }}>
+          {formatNaturalProgress(item)}
+        </p>
+
+        <div className="flex justify-between items-center mt-1">
           <span className="text-[12px] text-[#9CA3AF]">{item.lastEventLabel} · {item.lastEventTime}</span>
-          <span className="text-[12px] font-medium text-[#2A7B76]">{latestUpdateText}</span>
+          <span className="text-[12px] text-[#9CA3AF]">{formatShortDate(item.updatedAt)}</span>
         </div>
         <div className="flex gap-1 flex-wrap mt-2">
           <ReworkPill parentItemId={item.parentItemId} parentName={item.parent?.name} />
@@ -400,7 +414,6 @@ export default function JobsPage() {
 
   const dept = session?.department.toUpperCase() ?? '';
 
-  // ── All useMemo hooks unconditionally above early return ──────────────────
   const filtered = useMemo(() => {
     if (!dept) return [];
     return mockItems.filter((item) => {
@@ -421,7 +434,6 @@ export default function JobsPage() {
       }
       return true;
     });
-    // mutationTick forces re-evaluation when mock data is mutated in-place
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dept, selectedSegment, selectedMonth, debouncedSearch, mutationTick]);
 
@@ -443,7 +455,6 @@ export default function JobsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   [dept, mutationTick]);
 
-  // ─── Early return — BELOW all hooks ──────────────────────────────────────
   if (!hasHydrated || !session || !session.isLoggedIn) {
     return (
       <div className="min-h-screen bg-[#F8F9FA] flex items-center justify-center">
