@@ -7,6 +7,7 @@ import { VendorPill, RoutingPill, ReworkPill, ReturnPill } from './PillBadges';
 import ProgressSlider from './ProgressSlider';
 import StepperControl from './StepperControl';
 import BatalkanControl from './BatalkanControl';
+import useUIStore from '@/store/uiStore';
 
 interface ItemCardProps {
   item: MockItem;
@@ -29,6 +30,7 @@ export default function ItemCard({
 }: ItemCardProps) {
   const [localProgress, setLocalProgress] = useState(item.progress);
   const startTimerRef = useRef<((prev: number) => void) | null>(null);
+  const openBottomSheet = useUIStore((s) => s.openBottomSheet);
 
   const isInteractive = isWorkerView && isOwnerStage && !item.allNG;
   const hasUnsaved = localProgress !== item.progress;
@@ -116,6 +118,16 @@ export default function ItemCard({
               onStartTimer={(fn) => { startTimerRef.current = fn; }}
             />
             <div className="flex items-center gap-2">
+              {/* Return button — DELIVERY stage only */}
+              {item.stage === 'DELIVERY' && (
+                <button
+                  type="button"
+                  onClick={() => openBottomSheet('return', item.id)}
+                  className="text-[#B33941] text-sm font-medium px-2"
+                >
+                  🔄 Return
+                </button>
+              )}
               {hasUnsaved && (
                 <button
                   type="button"

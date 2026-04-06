@@ -3,9 +3,9 @@
 import React from 'react';
 import useUIStore from '@/store/uiStore';
 import QCGateSheet from '@/components/sheets/QCGateSheet';
-import DeliveryGateSheet from '@/components/ui/DeliveryGateSheet';
+import DeliveryGateSheet from '@/components/sheets/DeliveryGateSheet';
+import ReturnProtocolSheet from '@/components/sheets/ReturnProtocolSheet';
 import IssueReportSheet from '@/components/ui/IssueReportSheet';
-import ReturnProtocolSheet from '@/components/ui/ReturnProtocolSheet';
 
 export default function BottomSheetManager() {
   const activeBottomSheet = useUIStore((s) => s.activeBottomSheet);
