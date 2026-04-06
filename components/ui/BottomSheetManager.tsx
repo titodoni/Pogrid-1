@@ -2,26 +2,30 @@
 
 import React from 'react';
 import useUIStore from '@/store/uiStore';
-import QCGateSheet from './QCGateSheet';
-import DeliveryGateSheet from './DeliveryGateSheet';
-import IssueReportSheet from './IssueReportSheet';
-import ReturnProtocolSheet from './ReturnProtocolSheet';
+import QCGateSheet from '@/components/sheets/QCGateSheet';
+import DeliveryGateSheet from '@/components/ui/DeliveryGateSheet';
+import IssueReportSheet from '@/components/ui/IssueReportSheet';
+import ReturnProtocolSheet from '@/components/ui/ReturnProtocolSheet';
 
 export default function BottomSheetManager() {
   const activeBottomSheet = useUIStore((s) => s.activeBottomSheet);
   const bottomSheetItemId = useUIStore((s) => s.bottomSheetItemId);
-  const closeBottomSheet  = useUIStore((s) => s.closeBottomSheet);
+  const closeBottomSheet = useUIStore((s) => s.closeBottomSheet);
 
-  if (!activeBottomSheet || !bottomSheetItemId) return null;
+  if (!activeBottomSheet) return null;
 
-  const props = { itemId: bottomSheetItemId, onDismiss: closeBottomSheet };
+  const itemId = bottomSheetItemId ?? '';
 
-  return (
-    <>
-      {activeBottomSheet === 'qc-gate'       && <QCGateSheet       {...props} />}
-      {activeBottomSheet === 'delivery-gate' && <DeliveryGateSheet  {...props} />}
-      {activeBottomSheet === 'issue'         && <IssueReportSheet   {...props} />}
-      {activeBottomSheet === 'return'        && <ReturnProtocolSheet {...props} />}
-    </>
-  );
+  switch (activeBottomSheet) {
+    case 'qc-gate':
+      return <QCGateSheet itemId={itemId} onDismiss={closeBottomSheet} />;
+    case 'delivery-gate':
+      return <DeliveryGateSheet itemId={itemId} onDismiss={closeBottomSheet} />;
+    case 'issue':
+      return <IssueReportSheet itemId={itemId} onDismiss={closeBottomSheet} />;
+    case 'return':
+      return <ReturnProtocolSheet itemId={itemId} onDismiss={closeBottomSheet} />;
+    default:
+      return null;
+  }
 }
