@@ -55,7 +55,7 @@ export default function ReturnProtocolSheet({
     item!.lastEventLabel = `Return: ${reason}`;
     item!.lastEventTime = timeStr;
 
-    // 2. Audit log — never rendered in UI
+    // 2. Audit log
     mockReturnItems.push({
       id: 'ret-' + Date.now(),
       originalItemId: item!.id,
@@ -69,23 +69,21 @@ export default function ReturnProtocolSheet({
     mockItemTracks.push({
       id: 'track-' + Date.now(),
       itemId: item!.id,
+      userId,
       department: 'DELIVERY',
       action: 'CLIENT_RETURN',
       createdAt: now,
     });
 
     closeBottomSheet();
-    // source='RETURN' now set — ReturnPill and StageBadge will reflect automatically
   }
 
   return (
     <BottomSheet isOpen={true} onDismiss={onDismiss}>
-      {/* Header */}
       <p className="text-[18px] font-semibold text-[#1A1A2E]">🔄 Return Klien</p>
       <p className="text-[14px] text-[#6B7280] mt-0.5">{item.name}</p>
       <p className="text-[13px] text-[#9CA3AF] mt-0.5">Max return: {item.qty} unit</p>
 
-      {/* Return Qty Stepper */}
       <p className="text-[13px] text-[#6B7280] mt-4 mb-1">Jumlah Unit Return:</p>
       <StepperControl
         current={returnQty}
@@ -93,7 +91,6 @@ export default function ReturnProtocolSheet({
         onChange={setReturnQty}
       />
 
-      {/* Reason Radio */}
       <p className="text-[13px] text-[#6B7280] mt-4 mb-2">Alasan Return:</p>
       <div className="flex flex-col">
         {RETURN_REASONS.map((r) => (
@@ -130,7 +127,6 @@ export default function ReturnProtocolSheet({
         ))}
       </div>
 
-      {/* Lainnya free-text */}
       {selectedReason === 'Lainnya' && (
         <input
           type="text"
@@ -141,7 +137,6 @@ export default function ReturnProtocolSheet({
         />
       )}
 
-      {/* Action Buttons */}
       <div className="flex gap-3 mt-6">
         <button
           type="button"
