@@ -3,6 +3,7 @@
 import React from 'react';
 import { StickyHeader } from './StickyHeader';
 import { BottomNav } from './BottomNav';
+import BottomSheetManager from '@/components/ui/BottomSheetManager';
 
 interface LayoutWrapperProps {
   children: React.ReactNode;
@@ -33,6 +34,8 @@ export function LayoutWrapper({
         {children}
       </main>
       <BottomNav role={role} department={department} />
+      {/* Gate sheets + Issue + Return — always mounted, reads from uiStore */}
+      <BottomSheetManager />
     </div>
   );
 }
