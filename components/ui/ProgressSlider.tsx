@@ -43,121 +43,142 @@ export default function ProgressSlider({ value, onChange, disabled }: ProgressSl
 
   return (
     <div
-      className={`flex items-center gap-3 select-none${disabled ? ' opacity-40 pointer-events-none' : ''}`}
+      className={`select-none${disabled ? ' opacity-40 pointer-events-none' : ''}`}
       style={{ minHeight: 72 }}
     >
-      {/* Track */}
-      <div
-        ref={trackRef}
-        className="relative flex-1"
-        style={{ height: 18, cursor: disabled ? 'default' : 'pointer' }}
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-        onPointerCancel={handlePointerUp}
-      >
-        {/* Track background */}
+      {/* Track + value label row */}
+      <div className="flex items-center gap-3">
+        {/* Track */}
         <div
-          className="absolute inset-0 rounded-full"
-          style={{ background: '#E5E7EB', borderRadius: 9 }}
-        />
+          ref={trackRef}
+          className="relative flex-1"
+          style={{ height: 18, cursor: disabled ? 'default' : 'pointer' }}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onPointerCancel={handlePointerUp}
+        >
+          {/* Track background */}
+          <div
+            className="absolute inset-0"
+            style={{ background: '#E5E7EB', borderRadius: 9 }}
+          />
 
-        {/* Track fill */}
-        <div
-          className="absolute top-0 left-0 h-full rounded-full"
-          style={{
-            width: `${value}%`,
-            background: '#2A7B76',
-            borderRadius: 9,
-            transition: 'width 80ms ease-out',
-          }}
-        />
+          {/* Track fill */}
+          <div
+            className="absolute top-0 left-0 h-full"
+            style={{
+              width: `${value}%`,
+              background: '#2A7B76',
+              borderRadius: 9,
+              transition: 'width 80ms ease-out',
+            }}
+          />
 
-        {/* Dots */}
-        {STEPS.map((step) => {
-          const isActive = step === value;
-          const isFilled = step < value;
-          const leftPct  = step === 0 ? 0 : step === 100 ? 100 : step;
+          {/* Dots */}
+          {STEPS.map((step) => {
+            const isActive = step === value;
+            const isFilled = step < value;
 
-          return (
-            <div
-              key={step}
-              // 48×48 tap area, centered on track
-              style={{
-                position: 'absolute',
-                left: `${leftPct}%`,
-                top: '50%',
-                transform: 'translate(-50%, -50%)',
-                width: 48,
-                height: 48,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                zIndex: 2,
-                touchAction: 'none',
-              }}
-              onPointerDown={(e) => {
-                if (disabled) return;
-                e.stopPropagation();
-                onChange(step);
-              }}
-            >
-              {isActive ? (
-                // Active dot — 36px, teal fill, white center ring
-                <div
-                  style={{
-                    width: 36,
-                    height: 36,
-                    borderRadius: '50%',
-                    background: '#2A7B76',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    boxShadow: '0 2px 8px rgba(42,123,118,0.35)',
-                    transition: 'transform 80ms ease-out',
-                  }}
-                >
+            return (
+              <div
+                key={step}
+                style={{
+                  position: 'absolute',
+                  left: `${step}%`,
+                  top: '50%',
+                  transform: 'translate(-50%, -50%)',
+                  width: 48,
+                  height: 48,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  zIndex: 2,
+                  touchAction: 'none',
+                }}
+                onPointerDown={(e) => {
+                  if (disabled) return;
+                  e.stopPropagation();
+                  onChange(step);
+                }}
+              >
+                {isActive ? (
                   <div
                     style={{
-                      width: 6,
-                      height: 6,
+                      width: 36,
+                      height: 36,
                       borderRadius: '50%',
-                      background: '#fff',
+                      background: '#2A7B76',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      boxShadow: '0 2px 8px rgba(42,123,118,0.35)',
+                    }}
+                  >
+                    <div
+                      style={{ width: 6, height: 6, borderRadius: '50%', background: '#fff' }}
+                    />
+                  </div>
+                ) : (
+                  <div
+                    style={{
+                      width: 20,
+                      height: 20,
+                      borderRadius: '50%',
+                      background: isFilled ? '#2A7B76' : '#fff',
+                      border: `2px solid ${isFilled ? '#2A7B76' : '#E5E7EB'}`,
+                      transition: 'background 80ms ease-out, border-color 80ms ease-out',
                     }}
                   />
-                </div>
-              ) : (
-                // Inactive dot — 20px
-                <div
-                  style={{
-                    width: 20,
-                    height: 20,
-                    borderRadius: '50%',
-                    background: isFilled ? '#2A7B76' : '#fff',
-                    border: `2px solid ${isFilled ? '#2A7B76' : '#E5E7EB'}`,
-                    transition: 'background 80ms ease-out, border-color 80ms ease-out',
-                  }}
-                />
-              )}
-            </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Value label */}
+        <span
+          style={{
+            minWidth: 44,
+            fontSize: 16,
+            fontWeight: 500,
+            color: '#1A1A2E',
+            textAlign: 'right',
+            fontFamily: 'DM Sans, sans-serif',
+            flexShrink: 0,
+          }}
+        >
+          {value}%
+        </span>
+      </div>
+
+      {/* Step labels row — below track, aligned to each dot */}
+      <div className="relative flex-1" style={{ height: 20, marginTop: 4 }}>
+        {STEPS.map((step) => {
+          const isActive = step === value;
+          // only show label at 0, 25, 50, 75, 100 to avoid crowding,
+          // but always show the active step
+          const showLabel = isActive || step === 0 || step === 50 || step === 100;
+          if (!showLabel) return null;
+          return (
+            <span
+              key={step}
+              style={{
+                position: 'absolute',
+                left: `${step}%`,
+                transform: 'translateX(-50%)',
+                fontSize: 10,
+                fontWeight: isActive ? 700 : 400,
+                color: isActive ? '#2A7B76' : '#9CA3AF',
+                whiteSpace: 'nowrap',
+                lineHeight: 1,
+              }}
+            >
+              {step}%
+            </span>
           );
         })}
       </div>
-
-      {/* Value label */}
-      <span
-        style={{
-          minWidth: 44,
-          fontSize: 16,
-          fontWeight: 500,
-          color: '#1A1A2E',
-          textAlign: 'right',
-          fontFamily: 'DM Sans, sans-serif',
-          flexShrink: 0,
-        }}
-      >
-        {value}%
-      </span>
     </div>
   );
 }
