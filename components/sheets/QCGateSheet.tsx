@@ -38,14 +38,16 @@ export default function QCGateSheet({
 
   if (!item) return null;
 
-  // ── validation ────────────────────────────────────────────────
+  const userId = session?.userId ?? 'unknown';
+
+  // ── validation ────────────────────────────────────────────
   const isValid =
     activePath === 'ng' &&
     ngQty > 0 &&
     selectedReason !== null &&
     (selectedReason !== 'Lainnya' || otherText.trim().length > 0);
 
-  // ── Path A ────────────────────────────────────────────────────
+  // ── Path A ────────────────────────────────────────────
   function executePathA() {
     const now = new Date().toISOString();
     const timeStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
@@ -59,32 +61,29 @@ export default function QCGateSheet({
     mockItemTracks.push({
       id: 'track-' + Date.now(),
       itemId: item!.id,
+      userId,
       department: 'QC',
       action: 'PASS_GATE',
       createdAt: now,
     });
     closeBottomSheet();
-    // No fade-in — card permanently leaves QC worker's list
   }
 
-  // ── Path B — Item Split Protocol ─────────────────────────────
+  // ── Path B — Item Split Protocol ─────────────────────────
   function executeItemSplit() {
     if (!isValid) return;
     const now = new Date().toISOString();
     const timeStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
     const reason = selectedReason === 'Lainnya' ? otherText.trim() : selectedReason!;
     const isAllNG = ngQty === item!.qty;
-    const userId = session?.userId ?? 'unknown';
     const splitQty = isAllNG ? item!.qty : ngQty;
 
     if (isAllNG) {
-      // Card A — stays at QC, marked allNG, disappears from active
       item!.allNG = true;
       item!.updatedAt = now;
       item!.lastEventLabel = 'Semua unit NG';
       item!.lastEventTime = timeStr;
     } else {
-      // Card A — partial pass → advance to DELIVERY
       item!.qty = item!.qty - ngQty;
       item!.stage = 'DELIVERY';
       item!.progress = 0;
@@ -95,7 +94,6 @@ export default function QCGateSheet({
       if (qcBreak) qcBreak.progress = 100;
     }
 
-    // Card B — rework child
     const rwCount = mockItems.filter((i) => i.parentItemId === item!.id).length;
     const rwItem = {
       id: 'rw-' + Date.now(),
@@ -137,13 +135,13 @@ export default function QCGateSheet({
     mockItemTracks.push({
       id: 'track-' + Date.now(),
       itemId: item!.id,
+      userId,
       department: 'QC',
       action: 'SPLIT_PASS',
       createdAt: now,
     });
 
     closeBottomSheet();
-    // No fade-in — both cases remove the original card from active list
   }
 
   return (
@@ -214,7 +212,6 @@ export default function QCGateSheet({
       {/* ─── PATH B ─── */}
       {activePath === 'ng' && (
         <div>
-          {/* NG Qty Stepper */}
           <p className="text-[13px] text-[#6B7280] mt-4 mb-1">Jumlah Unit NG:</p>
           <StepperControl
             current={ngQty}
@@ -222,7 +219,6 @@ export default function QCGateSheet({
             onChange={setNgQty}
           />
 
-          {/* Reason Radio */}
           <p className="text-[13px] text-[#6B7280] mt-4 mb-2">Alasan NG:</p>
           <div className="flex flex-col">
             {NG_REASONS.map((r) => (
@@ -233,7 +229,6 @@ export default function QCGateSheet({
                 className="h-12 flex items-center gap-3 border-b border-[#F3F4F6] cursor-pointer w-full text-left"
                 style={{ minHeight: 48 }}
               >
-                {/* Radio circle */}
                 <span
                   className="flex-shrink-0 rounded-full border-2 flex items-center justify-center"
                   style={{
@@ -263,7 +258,6 @@ export default function QCGateSheet({
             ))}
           </div>
 
-          {/* 'Lainnya' free-text — ONLY keyboard exception */}
           {selectedReason === 'Lainnya' && (
             <input
               type="text"
@@ -274,7 +268,6 @@ export default function QCGateSheet({
             />
           )}
 
-          {/* Action Buttons */}
           <div className="flex gap-3 mt-6">
             <button
               type="button"
