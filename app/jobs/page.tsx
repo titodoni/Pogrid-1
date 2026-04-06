@@ -50,7 +50,6 @@ function formatShortDate(iso: string): string {
   return new Date(iso).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' });
 }
 
-/** Natural-language progress for collapsed card */
 function formatNaturalProgress(item: MockItem): string {
   if (item.qty === 1) {
     if (item.progress === 0) return 'Belum mulai';
@@ -204,6 +203,9 @@ function WorkerItemSummaryCard({
   const isBinaryDelivery = item.stage === 'DELIVERY' && item.qty === 1;
   const isBinary         = isBinaryQC || isBinaryDelivery;
 
+  // Whether this card shows an actionable update panel (not read-only, not binary)
+  const showUpdateButton = isOwnerStage && !isBinary && !item.allNG && !expanded;
+
   function renderTaskPanel() {
     if (item.allNG) {
       return <p className="text-[13px] text-[#B33941] font-medium">Semua unit gagal QC</p>;
@@ -292,7 +294,10 @@ function WorkerItemSummaryCard({
       className="bg-white rounded-xl border border-[#E5E7EB] mb-3 overflow-hidden scroll-mt-16"
       style={{ opacity: exiting ? 0 : 1, transition: 'opacity 250ms ease-out' }}
     >
+      {/* ─── Collapsed header ─── */}
       <button type="button" onClick={onToggle} className="w-full text-left p-4">
+
+        {/* Row 1: item name + overall % */}
         <div className="flex justify-between items-start">
           <span className="flex-1 pr-2 leading-snug">
             <span className="text-[18px] font-bold text-[#1A1A2E]">{item.name}</span>
@@ -304,7 +309,11 @@ function WorkerItemSummaryCard({
             : <span className="text-sm text-[#6B7280]">{overall}%</span>
           }
         </div>
+
+        {/* Row 2: client */}
         <p className="text-[13px] font-normal text-[#6B7280] mt-0.5">{item.po.clientName}</p>
+
+        {/* Row 3: qty · due · countdown */}
         <p className="text-[13px] mt-1 flex flex-wrap items-center gap-x-1">
           <span className="text-[15px] font-bold text-[#1A1A2E]">{item.qty} pcs</span>
           <span className="text-[#9CA3AF]">·</span>
@@ -322,17 +331,24 @@ function WorkerItemSummaryCard({
             {countdownText}
           </span>
         </p>
+
+        {/* Row 4: stage breakdown (small, secondary) */}
         <p className="text-[12px] text-[#9CA3AF] mt-1 leading-relaxed">{formatStageBreakdown(item)}</p>
 
-        {/* Natural-language progress — replaces mini progress bar */}
-        <p className="text-[13px] font-medium mt-2" style={{ color: '#2A7B76' }}>
+        {/* Row 5: MAIN STATUS — big, centered, teal */}
+        <p
+          className="text-center font-bold mt-3"
+          style={{ fontSize: 20, color: '#2A7B76', letterSpacing: '-0.01em' }}
+        >
           {formatNaturalProgress(item)}
         </p>
 
-        <div className="flex justify-between items-center mt-1">
-          <span className="text-[12px] text-[#9CA3AF]">{item.lastEventLabel} · {item.lastEventTime}</span>
-          <span className="text-[12px] text-[#9CA3AF]">{formatShortDate(item.updatedAt)}</span>
-        </div>
+        {/* Row 6: last event meta */}
+        <p className="text-center text-[11px] text-[#9CA3AF] mt-1">
+          {item.lastEventLabel} · {item.lastEventTime} · {formatShortDate(item.updatedAt)}
+        </p>
+
+        {/* Row 7: pills */}
         <div className="flex gap-1 flex-wrap mt-2">
           <ReworkPill parentItemId={item.parentItemId} parentName={item.parent?.name} />
           <ReturnPill source={item.source} returnBreadcrumb={item.returnBreadcrumb} />
@@ -341,6 +357,26 @@ function WorkerItemSummaryCard({
         </div>
       </button>
 
+      {/* ─── "Update Progress" button — only on collapsed + owner + not binary ─── */}
+      {showUpdateButton && (
+        <div className="px-4 pb-4">
+          <button
+            type="button"
+            onClick={onToggle}
+            className="w-full rounded-xl text-[14px] font-semibold"
+            style={{
+              minHeight: 48,
+              background: '#F0FAF9',
+              color: '#2A7B76',
+              border: '1.5px solid #2A7B76',
+            }}
+          >
+            Update Progress
+          </button>
+        </div>
+      )}
+
+      {/* ─── Expanded panel ─── */}
       {expanded && (
         <div className="px-4 pb-4 border-t border-[#E5E7EB]">
           <p className="text-sm font-semibold text-[#1D3B4D] mt-4 mb-3">UPDATE · {item.stage}</p>
