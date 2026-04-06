@@ -77,6 +77,25 @@ export interface MockSession {
   isLoggedIn: boolean;
 }
 
+export interface MockReturnItem {
+  id: string;
+  originalItemId: string;
+  qty: number;
+  reason: string;
+  filedById: string;
+  createdAt: string;
+}
+
+export interface MockItemTrack {
+  id: string;
+  itemId: string;
+  userId: string;
+  department: string;
+  action: string;
+  progress?: number;
+  createdAt: string;
+}
+
 // ─── mockUsers ───────────────────────────────────────────────────────────────
 
 export const mockUsers: MockUser[] = [
@@ -150,8 +169,6 @@ export const mockPOs: MockPO[] = [
 ];
 
 // ─── mockItems ───────────────────────────────────────────────────────────────
-// NOTE: object properties (progress, updatedAt) are mutated in-memory during
-// mock sessions — array reference itself never changes, so const is correct.
 
 export const mockItems: MockItem[] = [
   {
@@ -411,8 +428,8 @@ export const mockItems: MockItem[] = [
 
 // ─── Audit log arrays ─────────────────────────────────────────────────────────
 
-export const mockReturnItems: Record<string, unknown>[] = [];
-export const mockItemTracks: Record<string, unknown>[] = [];
+export const mockReturnItems: MockReturnItem[] = [];
+export const mockItemTracks: MockItemTrack[] = [];
 
 // ─── mockInvoiceActions ───────────────────────────────────────────────────────
 
