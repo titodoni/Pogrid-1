@@ -3,7 +3,7 @@
 import React, { useEffect } from 'react';
 import { Truck } from 'lucide-react';
 import BottomSheet from '@/components/ui/BottomSheet';
-import { mockItems, mockItemTracks } from '@/lib/mockData';
+import { mockItems, mockItemTracks, mockSession } from '@/lib/mockData';
 import useUIStore from '@/store/uiStore';
 
 export default function DeliveryGateSheet({
@@ -36,6 +36,7 @@ export default function DeliveryGateSheet({
     mockItemTracks.push({
       id: 'track-' + Date.now(),
       itemId: item!.id,
+      userId: mockSession.userId,
       department: 'DELIVERY',
       action: 'DELIVERY_GATE',
       createdAt: now,
