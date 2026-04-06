@@ -20,6 +20,7 @@ export default function ReturnProtocolSheet({
   onDismiss: () => void;
 }) {
   const item = mockItems.find((i) => i.id === itemId);
+  const session = useUIStore((s) => s.session);
   const [returnQty, setReturnQty] = useState(1);
   const [reason, setReason] = useState('');
   const [otherText, setOtherText] = useState('');
@@ -32,7 +33,7 @@ export default function ReturnProtocolSheet({
     const now = new Date().toISOString();
     const timeStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
     const finalReason = reason === 'Lainnya' ? (otherText.trim() || 'Lainnya') : reason;
-    // Regress item to QC
+    const userId = session?.userId ?? 'unknown';
     item!.stage = 'QC';
     item!.progress = 0;
     item!.updatedAt = now;
@@ -40,9 +41,9 @@ export default function ReturnProtocolSheet({
     item!.lastEventTime = timeStr;
     item!.issues.push({
       id: `return-${Date.now()}`,
-      label: `Return (${returnQty} pcs): ${finalReason}`,
+      reason: `Return (${returnQty} pcs): ${finalReason}`,
       resolved: false,
-      filedAt: timeStr,
+      filedById: userId,
     });
     setDone(true);
     setTimeout(() => {
@@ -55,7 +56,7 @@ export default function ReturnProtocolSheet({
     return (
       <BottomSheet isOpen={true} onDismiss={onDismiss}>
         <div className="flex flex-col items-center py-8 gap-3">
-          <span className="text-4xl">↩️</span>
+          <span className="text-4xl">\u21a9\ufe0f</span>
           <p className="text-[15px] font-semibold text-[#1A1A2E]">Return dicatat</p>
           <p className="text-[13px] text-[#6B7280]">Item dikembalikan ke tahap QC</p>
         </div>
@@ -66,9 +67,8 @@ export default function ReturnProtocolSheet({
   return (
     <BottomSheet isOpen={true} onDismiss={onDismiss}>
       <h2 className="text-[17px] font-bold text-[#1A1A2E] mb-1">Return dari Client</h2>
-      <p className="text-[13px] text-[#6B7280] mb-5">{item.name} · {item.po.clientName}</p>
+      <p className="text-[13px] text-[#6B7280] mb-5">{item.name} \u00b7 {item.po.clientName}</p>
 
-      {/* Qty */}
       <div className="mb-4">
         <p className="text-[13px] font-semibold text-[#1A1A2E] mb-2">Jumlah dikembalikan</p>
         <div className="flex gap-2 flex-wrap">
@@ -90,7 +90,6 @@ export default function ReturnProtocolSheet({
         </div>
       </div>
 
-      {/* Reason */}
       <div className="mb-5">
         <p className="text-[13px] font-semibold text-[#1A1A2E] mb-2">Alasan</p>
         <div className="flex flex-col gap-2">

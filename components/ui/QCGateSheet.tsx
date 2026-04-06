@@ -21,6 +21,7 @@ export default function QCGateSheet({
   onDismiss: () => void;
 }) {
   const item = mockItems.find((i) => i.id === itemId);
+  const session = useUIStore((s) => s.session);
   const [path, setPath] = useState<'idle' | 'ng'>('idle');
   const [ngQty, setNgQty] = useState(1);
   const [reason, setReason] = useState('');
@@ -48,6 +49,7 @@ export default function QCGateSheet({
     const timeStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
     const finalReason = reason === 'Lainnya' ? otherText || 'Lainnya' : reason;
     const isAllNG = ngQty >= item!.qty;
+    const userId = session?.userId ?? 'unknown';
 
     if (isAllNG) {
       item!.allNG = true;
@@ -59,7 +61,7 @@ export default function QCGateSheet({
       item!.stage = 'DELIVERY';
       item!.progress = 0;
       item!.updatedAt = now;
-      item!.lastEventLabel = `Lulus QC — ${ngQty} unit NG`;
+      item!.lastEventLabel = `Lulus QC \u2014 ${ngQty} unit NG`;
       item!.lastEventTime = timeStr;
       const qcBreak = item!.stageBreakdown.find((b) => b.stage === 'QC');
       if (qcBreak) qcBreak.progress = 100;
@@ -83,9 +85,9 @@ export default function QCGateSheet({
       issues: [
         {
           id: `issue-rw-${Date.now()}`,
-          label: `Rework: ${finalReason}`,
+          reason: `Rework: ${finalReason}`,
           resolved: false,
-          filedAt: timeStr,
+          filedById: userId,
         },
       ],
       stageBreakdown: [{ stage: 'QC', progress: 0, isStalled: false }],
@@ -100,7 +102,7 @@ export default function QCGateSheet({
     <BottomSheet isOpen={true} onDismiss={onDismiss}>
       <h2 className="text-[17px] font-bold text-[#1A1A2E] mb-1">QC Gate</h2>
       <p className="text-[13px] text-[#6B7280] mb-5">
-        {item.name} &nbsp;·&nbsp; {item.qty} pcs
+        {item.name} &nbsp;\u00b7&nbsp; {item.qty} pcs
       </p>
 
       {path === 'idle' && (
@@ -111,7 +113,7 @@ export default function QCGateSheet({
             className="w-full rounded-xl text-white text-[15px] font-semibold"
             style={{ minHeight: 56, background: '#2A7B76' }}
           >
-            ✅ Semua unit lolos QC
+            \u2705 Semua unit lolos QC
           </button>
           <button
             type="button"
@@ -119,14 +121,13 @@ export default function QCGateSheet({
             className="w-full rounded-xl text-[15px] font-semibold bg-white"
             style={{ minHeight: 56, border: '1.5px solid #B33941', color: '#B33941' }}
           >
-            ❌ Ada unit NG?
+            \u274c Ada unit NG?
           </button>
         </div>
       )}
 
       {path === 'ng' && (
         <div className="flex flex-col gap-4">
-          {/* Qty selector */}
           <div>
             <p className="text-[13px] font-semibold text-[#1A1A2E] mb-2">Jumlah NG</p>
             <div className="flex gap-2 flex-wrap">
@@ -148,7 +149,6 @@ export default function QCGateSheet({
             </div>
           </div>
 
-          {/* Reason */}
           <div>
             <p className="text-[13px] font-semibold text-[#1A1A2E] mb-2">Alasan</p>
             <div className="flex flex-col gap-2">
@@ -180,7 +180,6 @@ export default function QCGateSheet({
             </div>
           </div>
 
-          {/* Actions */}
           <div className="flex gap-3 mt-1">
             <button
               type="button"

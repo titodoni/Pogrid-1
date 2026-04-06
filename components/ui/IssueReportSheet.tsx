@@ -22,6 +22,7 @@ export default function IssueReportSheet({
   onDismiss: () => void;
 }) {
   const item = mockItems.find((i) => i.id === itemId);
+  const session = useUIStore((s) => s.session);
   const [selected, setSelected] = useState('');
   const [otherText, setOtherText] = useState('');
   const [submitted, setSubmitted] = useState(false);
@@ -30,17 +31,17 @@ export default function IssueReportSheet({
   if (!item) return null;
 
   function handleSubmit() {
-    const label = selected === 'Lainnya' ? (otherText.trim() || 'Lainnya') : selected;
+    const reason = selected === 'Lainnya' ? (otherText.trim() || 'Lainnya') : selected;
     const now = new Date().toISOString();
     const timeStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
     item!.issues.push({
       id: `issue-${Date.now()}`,
-      label,
+      reason,
       resolved: false,
-      filedAt: timeStr,
+      filedById: session?.userId ?? 'unknown',
     });
     item!.updatedAt = now;
-    item!.lastEventLabel = `🚩 ${label}`;
+    item!.lastEventLabel = `\uD83D\uDEA9 ${reason}`;
     item!.lastEventTime = timeStr;
     setSubmitted(true);
     setTimeout(() => {
@@ -53,7 +54,7 @@ export default function IssueReportSheet({
     return (
       <BottomSheet isOpen={true} onDismiss={onDismiss}>
         <div className="flex flex-col items-center py-8 gap-3">
-          <span className="text-4xl">🚩</span>
+          <span className="text-4xl">\uD83D\uDEA9</span>
           <p className="text-[15px] font-semibold text-[#1A1A2E]">Masalah dilaporkan</p>
           <p className="text-[13px] text-[#6B7280]">Supervisor akan segera ditindaklanjuti</p>
         </div>
@@ -105,7 +106,7 @@ export default function IssueReportSheet({
           color: selected && !(selected === 'Lainnya' && !otherText.trim()) ? 'white' : '#9CA3AF',
         }}
       >
-        🚩 Laporkan
+        \uD83D\uDEA9 Laporkan
       </button>
     </BottomSheet>
   );
