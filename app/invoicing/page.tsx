@@ -1,22 +1,26 @@
 'use client';
 export const dynamic = 'force-dynamic';
 
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import useUIStore from '@/store/uiStore';
 import { StickyHeader } from '@/components/layout/StickyHeader';
 import { BottomNav } from '@/components/layout/BottomNav';
 import { mockItems, mockPOs, mockInvoiceActions } from '@/lib/mockData';
-import { formatDateID } from '@/lib/poUtils';
 
 type FilterTab = 'Semua' | 'Belum Invoice' | 'Menunggu Bayar' | 'Lunas';
+
+// Snapshot of mutable mockItems so React re-renders when mutations happen
+function snapshot() {
+  return mockItems.map(i => ({ ...i }));
+}
 
 export default function InvoicingPage() {
   const hasHydrated = useUIStore(s => s._hasHydrated);
   const session = useUIStore(s => s.session);
   const [activeFilter, setActiveFilter] = useState<FilterTab>('Semua');
-  const [tick, setTick] = useState(0);
+  const [items, setItems] = useState(snapshot);
 
-  const forceUpdate = () => setTick(t => t + 1);
+  const refresh = useCallback(() => setItems(snapshot()), []);
 
   useEffect(() => {
     if (!hasHydrated) return;
@@ -25,42 +29,18 @@ export default function InvoicingPage() {
     if (!['finance', 'manager', 'admin'].includes(session.role)) { window.location.href = '/'; }
   }, [hasHydrated, session]);
 
-  if (!hasHydrated || !session || !session.isLoggedIn) {
-    return (
-      <div className="min-h-screen bg-[#F8F9FA] flex items-center justify-center">
-        <div className="w-12 h-12 rounded-full border-4 border-[#2A7B76] border-t-transparent animate-spin" />
-      </div>
-    );
-  }
+  const doneItems = useMemo(() => items.filter(i => i.stage === 'DONE'), [items]);
+  const unpaidCount   = useMemo(() => doneItems.filter(i => i.invoiceStatus === 'UNPAID').length,   [doneItems]);
+  const invoicedCount = useMemo(() => doneItems.filter(i => i.invoiceStatus === 'INVOICED').length, [doneItems]);
+  const paidCount     = useMemo(() => doneItems.filter(i => i.invoiceStatus === 'PAID').length,     [doneItems]);
 
-  // eslint-disable-next-line react-hooks/rules-of-hooks
-  const doneItems = useMemo(() => mockItems.filter(i => i.stage === 'DONE'), [tick]);
-
-  // eslint-disable-next-line react-hooks/rules-of-hooks
-  const unpaidCount = useMemo(
-    () => mockItems.filter(i => i.stage === 'DONE' && i.invoiceStatus === 'UNPAID').length,
-    [tick]
-  );
-  // eslint-disable-next-line react-hooks/rules-of-hooks
-  const invoicedCount = useMemo(
-    () => mockItems.filter(i => i.invoiceStatus === 'INVOICED').length,
-    [tick]
-  );
-  // eslint-disable-next-line react-hooks/rules-of-hooks
-  const paidCount = useMemo(
-    () => mockItems.filter(i => i.invoiceStatus === 'PAID').length,
-    [tick]
-  );
-
-  // eslint-disable-next-line react-hooks/rules-of-hooks
   const filteredItems = useMemo(() => {
-    if (activeFilter === 'Belum Invoice') return doneItems.filter(i => i.invoiceStatus === 'UNPAID');
-    if (activeFilter === 'Menunggu Bayar') return doneItems.filter(i => i.invoiceStatus === 'INVOICED');
-    if (activeFilter === 'Lunas') return doneItems.filter(i => i.invoiceStatus === 'PAID');
+    if (activeFilter === 'Belum Invoice')   return doneItems.filter(i => i.invoiceStatus === 'UNPAID');
+    if (activeFilter === 'Menunggu Bayar')  return doneItems.filter(i => i.invoiceStatus === 'INVOICED');
+    if (activeFilter === 'Lunas')           return doneItems.filter(i => i.invoiceStatus === 'PAID');
     return doneItems;
   }, [activeFilter, doneItems]);
 
-  // eslint-disable-next-line react-hooks/rules-of-hooks
   const groupedByPO = useMemo(() => {
     const map = new Map<string, typeof filteredItems>();
     filteredItems.forEach(item => {
@@ -71,32 +51,30 @@ export default function InvoicingPage() {
     return map;
   }, [filteredItems]);
 
-  function executeSendInvoice(itemId: string) {
+  const executeSendInvoice = useCallback((itemId: string) => {
     const item = mockItems.find(i => i.id === itemId);
-    if (!item) return;
+    if (!item || !session) return;
     item.invoiceStatus = 'INVOICED';
     item.updatedAt = new Date().toISOString();
-    mockInvoiceActions.push({
-      itemId,
-      action: 'INVOICED',
-      performedById: session!.userId,
-      createdAt: new Date().toISOString(),
-    });
-    forceUpdate();
-  }
+    mockInvoiceActions.push({ itemId, action: 'INVOICED', performedById: session.userId, createdAt: new Date().toISOString() });
+    refresh();
+  }, [session, refresh]);
 
-  function executeMarkPaid(itemId: string) {
+  const executeMarkPaid = useCallback((itemId: string) => {
     const item = mockItems.find(i => i.id === itemId);
-    if (!item) return;
+    if (!item || !session) return;
     item.invoiceStatus = 'PAID';
     item.updatedAt = new Date().toISOString();
-    mockInvoiceActions.push({
-      itemId,
-      action: 'PAID',
-      performedById: session!.userId,
-      createdAt: new Date().toISOString(),
-    });
-    forceUpdate();
+    mockInvoiceActions.push({ itemId, action: 'PAID', performedById: session.userId, createdAt: new Date().toISOString() });
+    refresh();
+  }, [session, refresh]);
+
+  if (!hasHydrated || !session || !session.isLoggedIn) {
+    return (
+      <div className="min-h-screen bg-[#F8F9FA] flex items-center justify-center">
+        <div className="w-12 h-12 rounded-full border-4 border-[#2A7B76] border-t-transparent animate-spin" />
+      </div>
+    );
   }
 
   const FILTERS: FilterTab[] = ['Semua', 'Belum Invoice', 'Menunggu Bayar', 'Lunas'];
@@ -119,7 +97,6 @@ export default function InvoicingPage() {
           }
         />
 
-        {/* FILTER TABS */}
         <div className="px-4 py-2 flex gap-2 overflow-x-auto scrollbar-hide">
           {FILTERS.map(f => (
             <button
@@ -158,14 +135,13 @@ export default function InvoicingPage() {
           {groupedByPO.size === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 gap-2">
               <p className="text-[22px]">🎉</p>
-              <p className="text-[14px] text-[#6B7280]">Semua invoice beres!</p>
+              <p className="text-[14px] text-[#6B7280]">All invoices up to date!</p>
             </div>
           ) : (
             Array.from(groupedByPO.entries()).map(([poId, poItems]) => {
               const po = mockPOs.find(p => p.id === poId);
               return (
                 <div key={poId} className="mb-4">
-                  {/* PO Group Header */}
                   <div className="pt-2 pb-1">
                     <p className="text-[12px] font-semibold text-[#6B7280] uppercase tracking-wide">
                       {po?.number ?? poId}
@@ -173,33 +149,24 @@ export default function InvoicingPage() {
                     <p className="text-[11px] text-[#9CA3AF]">{po?.clientName}</p>
                   </div>
 
-                  {/* Invoice Items */}
                   {poItems.map(item => (
                     <div key={item.id} className="bg-white rounded-xl border border-[#E5E7EB] p-3 mb-2">
-                      {/* ROW A */}
                       <div className="flex justify-between items-center">
                         <div>
                           <p className="text-[13px] font-semibold text-[#1A1A2E]">{item.name}</p>
                           <p className="text-[11px] text-[#9CA3AF] mt-0.5">{item.qty} unit</p>
                         </div>
                         {item.invoiceStatus === 'UNPAID' && (
-                          <span className="bg-[#FEF2F2] text-[#B33941] text-[10px] px-2 h-5 rounded-full flex items-center">
-                            Belum Invoice
-                          </span>
+                          <span className="bg-[#FEF2F2] text-[#B33941] text-[10px] px-2 h-5 rounded-full flex items-center">Belum Invoice</span>
                         )}
                         {item.invoiceStatus === 'INVOICED' && (
-                          <span className="bg-[#ECFDF5] text-[#2A7B76] text-[10px] px-2 h-5 rounded-full flex items-center">
-                            Invoice Terkirim
-                          </span>
+                          <span className="bg-[#ECFDF5] text-[#2A7B76] text-[10px] px-2 h-5 rounded-full flex items-center">Invoice Terkirim</span>
                         )}
                         {item.invoiceStatus === 'PAID' && (
-                          <span className="bg-[#F0FDF4] text-[#437A3B] text-[10px] px-2 h-5 rounded-full flex items-center">
-                            ✓ Lunas
-                          </span>
+                          <span className="bg-[#F0FDF4] text-[#437A3B] text-[10px] px-2 h-5 rounded-full flex items-center">✓ Lunas</span>
                         )}
                       </div>
 
-                      {/* ROW B — action */}
                       <div className="mt-2 flex justify-end">
                         {item.invoiceStatus === 'UNPAID' && (
                           <button
