@@ -414,6 +414,17 @@ export const mockItems: MockItem[] = [
 export const mockReturnItems: Record<string, unknown>[] = [];
 export const mockItemTracks: Record<string, unknown>[] = [];
 
+// ─── mockInvoiceActions ───────────────────────────────────────────────────────
+
+export interface MockInvoiceAction {
+  itemId: string;
+  action: 'INVOICED' | 'PAID';
+  performedById: string;
+  createdAt: string;
+}
+
+export const mockInvoiceActions: MockInvoiceAction[] = [];
+
 // ─── mockSession (default for UI simulation) ──────────────────────────────────
 
 export const mockSession: MockSession = {
